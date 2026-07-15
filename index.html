@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>GMOP Manager｜司機派件管理系統</title>
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="GMOP Manager" />
+<meta name="theme-color" content="#1A4A8A" />
+<style>
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:#F0F4FA; overscroll-behavior-y: none; }
+  body { -webkit-font-smoothing: antialiased; }
+  input, textarea, button { font-family: inherit; }
+  #root { min-height: 100vh; }
+</style>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useRef, useEffect } = React;
+
+const C = {
+  navy: "#1A4A8A", blue: "#2B7BE8", blueMid: "#4A95F0",
+  blueLight: "#D6E8FF", blueSoft: "#EEF5FF",
+  white: "#FFFFFF", bg: "#F0F4FA",
+  grayLight: "#EDF2F7", grayBorder: "#D8E2EE",
+  gray: "#718096", textMuted: "#A0AEC0",
+  text: "#1A202C", textSub: "#4A5568",
+  red: "#E53E3E", redLight: "#FED7D7", redSoft: "#FFF5F5",
+  orange: "#E07B2A", orangeLight: "#FDEBD5",
+  green: "#2F9E5E", greenLight: "#D4F0E2", greenSoft: "#EDF9F4",
+  yellow: "#C9960A", yellowLight: "#FEF9C3",
+  pink: "#FF6B9D",
+  shadow: "0 2px 10px rgba(30,60,120,0.09)",
+  shadowBlue: "0 4px 16px rgba(43,123,232,0.22)",
+};
+
+// ME is now passed as a prop to App
+const DRIVERS = [
+  { id: "D01", name: "世龍", phone: "0912-001001" },
+  { id: "D02", name: "士峰", phone: "0912-002002" },
+  { id: "D03", name: "軒照", phone: "0912-003003" },
+];
+
+const REJECT_REASONS = ["地址找不到", "客戶不在現場", "件數嚴重不符", "道路封閉", "路線調整，無法配送", "其他原因"];
+const nowStr = () => new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" });
+const net = c => c.pcs - (c.cancel_pcs || 0);
+// Google Maps 有時不會把百分比編碼的中文還原，導致顯示亂碼。
+// 這裡只針對網址保留字元做最小必要編碼，中文字直接保留原樣。
+const mapAddr = (str) => str.replace(/ /g,"%20").replace(/#/g,"%23").replace(/&/g,"%26").replace(/\+/g,"%2B").replace(/\|/g,"%7C");
+const dName = id => DRIVERS.find(d => d.id === id)?.name || "";
+const dPhone = id => DRIVERS.find(d => d.id === id)?.phone || "";
+
+const STATUS_CFG = {
+  已指派: { color: C.blue,   light: C.blueLight,  soft: C.blueSoft,  icon: "🔔", label: "新案件" },
+  已接單: { color: C.navy,   light: C.blueLight,  soft: C.blueSoft,  icon: "🚚", label: "待取件" },
+  待取件: { color: C.navy,   light: C.blueLight,  soft: C.blueSoft,  icon: "🚚", label: "待取件" },
+  已取件: { color: C.green,  light: C.greenLight, soft: C.greenSoft, icon: "✅", label: "已取件" },
+  退回:   { color: C.red,    light: C.redLight,   soft: C.redSoft,   icon: "⚠️", label: "退回"   },
+};
+
+const initCases = [
+  // 世龍（D01・隊長）── 已取件／待取件／新案件 各1筆
+  { id:"GMP-006", status:"已取件", driver_id:"D01", customer:"太子天一有限公司",       name:"陳佳羽", address:"台北市中正區同安街82-1號4樓",       phone:"02-23680313",  pickup_time:"10:30", pcs:1, cancel_pcs:0, pcs_actual:1, remark:"Love Dear", assigned_at:"09:00", order:0, wait_min:0, pickup_at:"10:45", session:null, sig_url:null, photo_url:null },
+  { id:"GMP-003", status:"待取件", driver_id:"D01", customer:"夢拓國際有限公司",       name:"張家偉", address:"新北市中和區建一路83號3樓",         phone:"0983-308-809", pickup_time:"15:00", pcs:1, cancel_pcs:0, pcs_actual:null, remark:"",  assigned_at:"14:00", order:1, wait_min:0, session:null, sig_url:null, photo_url:null },
+  { id:"GMP-011", status:"已指派", driver_id:"D01", customer:"煌鎰金屬股份有限公司",   name:"王雅竫", address:"新北市蘆洲區國道路二段101號1樓",    phone:"02-22963715",  pickup_time:"11:00", pcs:1, cancel_pcs:0, pcs_actual:null, remark:"",  assigned_at:"09:40", order:2, wait_min:1, session:null, sig_url:null, photo_url:null },
+
+  // 士峰（D02）── 已取件／待取件／新案件 各1筆
+  { id:"GMP-001", status:"已指派", driver_id:"D02", customer:"國際胖胖貓有限公司",     name:"張瑋軒", address:"新北市新莊區五權二路26號6樓之4",     phone:"02-22980867",  pickup_time:"15:30", pcs:3, cancel_pcs:0, pcs_actual:null, remark:"",  assigned_at:"14:05", order:0, wait_min:3, session:null, sig_url:null, photo_url:null },
+  { id:"GMP-005", status:"待取件", driver_id:"D02", customer:"增站運籌科技股份有限公司", name:"葉玉真", address:"新北市樹林區佳園路二段155號B棟2F",  phone:"0989-096-831", pickup_time:"15:00", pcs:1, cancel_pcs:0, pcs_actual:null, remark:"",  assigned_at:"13:50", order:0, wait_min:0, session:null, sig_url:null, photo_url:null },
+  { id:"GMP-012", status:"已取件", driver_id:"D02", customer:"嘉曜醫材有限公司",       name:"竺佳慶", address:"新北市中和區中正路716號3樓之5",     phone:"02-77308786",  pickup_time:"13:30", pcs:1, cancel_pcs:0, pcs_actual:1, remark:"",  assigned_at:"12:50", order:1, wait_min:0, pickup_at:"13:40", session:null, sig_url:null, photo_url:null },
+
+  // 軒照（D03）── 已取件／待取件／新案件 各1筆
+  { id:"GMP-010", status:"已指派", driver_id:"D03", customer:"A091-向上運動股份有限公司", name:"陳'S",   address:"台北市松山區八德路三段12巷7弄9號1樓", phone:"02-25770610",  pickup_time:"14:00", pcs:1, cancel_pcs:0, pcs_actual:null, remark:"",  assigned_at:"13:15", order:0, wait_min:2, session:null, sig_url:null, photo_url:null },
+  { id:"GMP-002", status:"待取件", driver_id:"D03", customer:"緹威國際有限公司",       name:"陳煒方", address:"新北市三重區成功路73巷19號",       phone:"02-2977-5580", pickup_time:"15:30", pcs:1, cancel_pcs:0, pcs_actual:null, remark:"請17:40前到", assigned_at:"14:00", order:0, wait_min:0, session:null, sig_url:null, photo_url:null },
+  { id:"GMP-007", status:"已取件", driver_id:"D03", customer:"GIRLS MONDAY",           name:"小軒",   address:"台北市南港區玉成街30號",           phone:"02-26516700#302", pickup_time:"15:30", pcs:1, cancel_pcs:0, pcs_actual:1, remark:"",  assigned_at:"14:20", order:1, wait_min:0, pickup_at:"15:25", session:null, sig_url:null, photo_url:null },
+
+  // 待指派 ── 4 筆，供世龍測試單筆／批次指派
+  { id:"GMP-004", status:"待指派", driver_id:null, customer:"宇宙紅蘿蔔有限公司",       name:"楊尚澤", address:"台北市大安區安居街33號6樓",         phone:"0931-273-569",   pickup_time:"15:00", pcs:1, cancel_pcs:0, pcs_actual:null, remark:"",                     assigned_at:null, order:0, wait_min:0, session:null, sig_url:null, photo_url:null },
+  { id:"GMP-008", status:"待指派", driver_id:null, customer:"恩碩有限公司",             name:"曾國倫", address:"238新北市樹林區中正路275巷1號",     phone:"02-23881311",    pickup_time:"16:00", pcs:1, cancel_pcs:0, pcs_actual:null, remark:"件數未填，請與客戶確認", assigned_at:null, order:1, wait_min:0, session:null, sig_url:null, photo_url:null },
+  { id:"GMP-009", status:"待指派", driver_id:null, customer:"A020-優迪股份有限公司",     name:"賴慧雯", address:"新北市新莊區環漢路三段522號6樓",    phone:"0953-545-525",   pickup_time:"14:00", pcs:9, cancel_pcs:0, pcs_actual:null, remark:"",                     assigned_at:null, order:2, wait_min:0, session:null, sig_url:null, photo_url:null },
+  { id:"GMP-013", status:"待指派", driver_id:null, customer:"詠麗生化科技股份有限公司",   name:"林宛君", address:"新北市五股區五工六路16號1樓",       phone:"02-22980799#111", pickup_time:"15:00", pcs:1, cancel_pcs:0, pcs_actual:null, remark:"",                     assigned_at:null, order:3, wait_min:0, session:null, sig_url:null, photo_url:null },
+];
+
+// ── Modals ──────────────────────────────────────────────
+
+function AssignModal({ cases, onClose, onAssign }) {
+  const [sel, setSel] = useState(null);
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(20,40,80,0.55)", zIndex:200, display:"flex", alignItems:"flex-end" }} onClick={onClose}>
+      <div style={{ background:C.white, borderRadius:"22px 22px 0 0", width:"100%", padding:"20px 20px 44px" }} onClick={e=>e.stopPropagation()}>
+        <div style={{ width:40, height:5, background:C.grayBorder, borderRadius:3, margin:"0 auto 16px" }} />
+        <div style={{ fontWeight:900, fontSize:16, color:C.text, marginBottom:4 }}>
+          {cases.length > 1 ? `批次指派 ${cases.length} 件` : "指派案件"}
+        </div>
+        <div style={{ marginBottom:14 }}>
+          {cases.map(c => <div key={c.id} style={{ fontSize:13, color:C.textSub, padding:"2px 0" }}>・{c.customer} {c.name}（{net(c)} 件）</div>)}
+        </div>
+        <div style={{ fontSize:12, color:C.textSub, fontWeight:600, marginBottom:10 }}>指派給誰？</div>
+        {DRIVERS.map(d => (
+          <button key={d.id} onClick={() => setSel(d.id)}
+            style={{ width:"100%", background:sel===d.id?C.blueSoft:C.grayLight, border:`1.5px solid ${sel===d.id?C.blue:C.grayBorder}`, borderRadius:12, padding:"13px 16px", display:"flex", alignItems:"center", gap:12, cursor:"pointer", marginBottom:8 }}>
+            <div style={{ width:38, height:38, background:sel===d.id?C.blue:C.grayBorder, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", color:sel===d.id?C.white:C.gray, fontWeight:900, fontSize:15, flexShrink:0 }}>{d.name[0]}</div>
+            <div style={{ flex:1, textAlign:"left" }}>
+              <div style={{ fontWeight:700, color:sel===d.id?C.blue:C.text, fontSize:15 }}>{d.name}</div>
+              <div style={{ fontSize:11, color:C.textMuted }}>{d.phone}</div>
+            </div>
+            {sel===d.id && <span style={{ color:C.blue, fontSize:20 }}>✓</span>}
+          </button>
+        ))}
+        <button onClick={() => sel && onAssign(sel)} disabled={!sel}
+          style={{ width:"100%", background:sel?`linear-gradient(135deg,${C.blue},${C.blueMid})`:C.grayLight, border:"none", borderRadius:14, padding:15, color:sel?C.white:C.textMuted, fontSize:15, fontWeight:800, cursor:sel?"pointer":"default", marginTop:8, marginBottom:10 }}>
+          確認指派{sel?`給${dName(sel)}`:""}
+        </button>
+        <button onClick={onClose} style={{ width:"100%", background:"transparent", border:`1.5px solid ${C.grayBorder}`, borderRadius:14, padding:13, color:C.textSub, fontSize:14, cursor:"pointer" }}>取消</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Signature Pad (fullscreen) ───────────────────────────
+function SignaturePad({ onSave, onCancel, customer }) {
+  const canvasRef = useRef(null);
+  const drawing = useRef(false);
+  const lastPos = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
+
+  const getPos = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - rect.left) * scaleX, y: (src.clientY - rect.top) * scaleY };
+  };
+
+  const start = (e) => { e.preventDefault(); drawing.current = true; lastPos.current = getPos(e, canvasRef.current); };
+  const move = (e) => {
+    e.preventDefault();
+    if (!drawing.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const pos = getPos(e, canvas);
+    ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = "#1A4A8A"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.stroke();
+    lastPos.current = pos;
+  };
+  const end = () => { drawing.current = false; };
+  const clear = () => {
+    const canvas = canvasRef.current; const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  };
+  const save = () => onSave(canvasRef.current.toDataURL("image/png"));
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: C.white, zIndex: 400, display: "flex", flexDirection: "column" }}>
+      <div style={{ background: `linear-gradient(135deg,${C.navy},${C.blue})`, padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <button onClick={onCancel} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 10, padding: "8px 14px", color: C.white, fontSize: 13, cursor: "pointer" }}>← 返回</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: C.white, fontWeight: 800, fontSize: 15 }}>✍️ 客戶簽收</div>
+          <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>{customer}</div>
+        </div>
+        <button onClick={clear} style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 10, padding: "8px 14px", color: C.white, fontSize: 13, cursor: "pointer" }}>清除</button>
+      </div>
+      <div style={{ background: C.blueSoft, padding: "10px 20px", textAlign: "center", fontSize: 13, color: C.blue, fontWeight: 600, flexShrink: 0 }}>
+        請客戶在下方空白處簽名
+      </div>
+      <div style={{ flex: 1, background: "#FAFBFF", display: "flex", alignItems: "stretch", padding: 16, overflow: "hidden" }}>
+        <canvas ref={canvasRef} width={700} height={900}
+          style={{ width: "100%", height: "100%", border: `2px dashed ${C.blueLight}`, borderRadius: 16, touchAction: "none", cursor: "crosshair", background: C.white, boxShadow: C.shadow }}
+          onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
+          onTouchStart={start} onTouchMove={move} onTouchEnd={end} />
+      </div>
+      <div style={{ padding: "16px 20px 40px", background: C.white, borderTop: `1px solid ${C.grayBorder}`, flexShrink: 0 }}>
+        <button onClick={save} style={{ width: "100%", background: `linear-gradient(135deg,${C.green},#27855A)`, border: "none", borderRadius: 14, padding: 16, color: C.white, fontSize: 16, fontWeight: 800, cursor: "pointer" }}>
+          ✅ 簽名完成
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PickupModal({ c, onClose, onConfirm }) {
+  const [pcs, setPcs] = useState(c.pcs_actual || net(c));
+  const [address, setAddress] = useState(c.address);
+  const [remark, setRemark] = useState(c.remark);
+  const [step, setStep] = useState(1);
+  const [showSig, setShowSig] = useState(false);
+  const [sigData, setSigData] = useState(null);
+  const [showPhoto, setShowPhoto] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState(null);
+  const inp = { width:"100%", background:C.grayLight, border:`1.5px solid ${C.grayBorder}`, borderRadius:12, padding:"12px 14px", color:C.text, fontSize:15, boxSizing:"border-box", outline:"none", fontFamily:"inherit" };
+
+  const handlePhoto = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhotoUrl(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  if (step===2) return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(20,40,80,0.6)", zIndex:300, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div style={{ background:C.white, borderRadius:22, padding:28, width:"100%", maxWidth:360 }}>
+        <div style={{ fontSize:44, textAlign:"center", marginBottom:10 }}>📦</div>
+        <div style={{ fontWeight:900, fontSize:17, color:C.text, textAlign:"center", marginBottom:6 }}>確認結案？</div>
+        <div style={{ color:C.textSub, fontSize:14, textAlign:"center", marginBottom:14 }}>{c.customer}・{c.name}</div>
+        <div style={{ background:C.grayLight, borderRadius:12, padding:"12px", marginBottom:14, textAlign:"center" }}>
+          <span style={{ color:C.text }}>實際取件 </span>
+          <span style={{ color:pcs!==net(c)?C.orange:C.green, fontWeight:900, fontSize:26 }}>{pcs}</span>
+          <span style={{ color:C.textSub }}> 件</span>
+          {pcs!==net(c) && <div style={{ color:C.orange, fontSize:12, marginTop:4 }}>⚠️ 與原始件數 {net(c)} 件不符</div>}
+        </div>
+        <div style={{ display:"flex", gap:8, marginBottom:16 }}>
+          {sigData && <div style={{ flex:1, background:C.blueSoft, borderRadius:10, padding:"6px 10px", textAlign:"center", fontSize:11, color:C.blue, fontWeight:700 }}>✍️ 已簽收</div>}
+          {photoUrl && <div style={{ flex:1, background:C.greenSoft, borderRadius:10, padding:"6px 10px", textAlign:"center", fontSize:11, color:C.green, fontWeight:700 }}>📷 已拍照</div>}
+        </div>
+        <button onClick={() => onConfirm({ pcs, address, remark, sigData, photoUrl })}
+          style={{ width:"100%", background:`linear-gradient(135deg,${C.green},#27855A)`, border:"none", borderRadius:14, padding:15, color:C.white, fontSize:16, fontWeight:800, cursor:"pointer", marginBottom:10 }}>✅ 確定完成結案</button>
+        <button onClick={() => setStep(1)} style={{ width:"100%", background:"transparent", border:`1.5px solid ${C.grayBorder}`, borderRadius:14, padding:13, color:C.textSub, fontSize:14, cursor:"pointer" }}>← 返回修改</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+    <div style={{ position:"fixed", inset:0, background:"rgba(20,40,80,0.5)", zIndex:200, display:"flex", alignItems:"flex-end" }} onClick={onClose}>
+      <div style={{ background:C.white, borderRadius:"22px 22px 0 0", width:"100%", padding:"20px 20px 44px", maxHeight:"92vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+        <div style={{ width:40, height:5, background:C.grayBorder, borderRadius:3, margin:"0 auto 16px" }} />
+        <div style={{ fontWeight:800, fontSize:15, color:C.text, marginBottom:12 }}>確認取件・{c.customer} {c.name}</div>
+
+        {/* 件數 */}
+        <div style={{ display:"flex", alignItems:"center", background:C.grayLight, borderRadius:14, padding:4, marginBottom:14 }}>
+          <button onClick={() => setPcs(p=>Math.max(1,p-1))} style={{ width:48, height:48, background:pcs>1?C.blue:C.grayBorder, border:"none", borderRadius:11, color:pcs>1?C.white:C.textMuted, fontSize:24, cursor:"pointer", fontWeight:700 }}>−</button>
+          <div style={{ flex:1, textAlign:"center" }}>
+            <div style={{ fontSize:30, fontWeight:900, color:pcs!==net(c)?C.orange:C.text, lineHeight:1 }}>{pcs}</div>
+            {pcs!==net(c) && <div style={{ fontSize:11, color:C.orange }}>原始 {net(c)} 件</div>}
+          </div>
+          <button onClick={() => setPcs(p=>p+1)} style={{ width:48, height:48, background:C.navy, border:"none", borderRadius:11, color:C.white, fontSize:24, cursor:"pointer", fontWeight:700 }}>＋</button>
+        </div>
+
+        <input value={address} onChange={e=>setAddress(e.target.value)} style={{ ...inp, marginBottom:12 }} placeholder="取件地址（如有修正）"/>
+        <textarea value={remark} onChange={e=>setRemark(e.target.value)} placeholder="備註" style={{ ...inp, height:64, resize:"none", marginBottom:16 }}/>
+
+        {/* 選配功能區 */}
+        <div style={{ display:"flex", gap:8, marginBottom:16 }}>
+          <button onClick={() => { setShowSig(s=>!s); if(showSig) setSigData(null); }}
+            style={{ flex:1, background:sigData?C.blueSoft:showSig?C.blueSoft:C.grayLight, border:`1.5px solid ${sigData||showSig?C.blue:C.grayBorder}`, borderRadius:12, padding:"11px 8px", color:sigData||showSig?C.blue:C.textSub, fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}>
+            {sigData ? "✍️ 已簽收 ✓" : "✍️ 需要簽收"}
+          </button>
+          <button onClick={() => { setShowPhoto(s=>!s); if(showPhoto) setPhotoUrl(null); }}
+            style={{ flex:1, background:photoUrl?C.greenSoft:showPhoto?C.greenSoft:C.grayLight, border:`1.5px solid ${photoUrl||showPhoto?C.green:C.grayBorder}`, borderRadius:12, padding:"11px 8px", color:photoUrl||showPhoto?C.green:C.textSub, fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}>
+            {photoUrl ? "📷 已拍照 ✓" : "📷 需要拍照"}
+          </button>
+        </div>
+
+        {/* 簽名板佔位符（實際渲染在外層） */}
+        {sigData && (
+          <div style={{ marginBottom:16, background:C.blueSoft, borderRadius:12, padding:10, position:"relative" }}>
+            <div style={{ fontSize:11, color:C.blue, fontWeight:700, marginBottom:6 }}>✍️ 客戶簽名</div>
+            <img src={sigData} style={{ width:"100%", borderRadius:8, background:C.white }} />
+            <button onClick={() => setSigData(null)} style={{ position:"absolute", top:8, right:8, background:C.white, border:`1px solid ${C.grayBorder}`, borderRadius:6, padding:"3px 8px", fontSize:11, color:C.textSub, cursor:"pointer" }}>重簽</button>
+          </div>
+        )}
+
+        {/* 照片上傳 */}
+        {showPhoto && !photoUrl && (
+          <div style={{ marginBottom:16 }}>
+            <label style={{ display:"block", background:C.white, border:`1.5px dashed ${C.green}`, borderRadius:14, padding:"20px", textAlign:"center", cursor:"pointer" }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>📷</div>
+              <div style={{ fontSize:13, fontWeight:700, color:C.green, marginBottom:4 }}>點此拍照或選擇照片</div>
+              <div style={{ fontSize:11, color:C.textMuted }}>支援相機拍攝或從相簿選取</div>
+              <input type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display:"none" }} />
+            </label>
+          </div>
+        )}
+        {photoUrl && (
+          <div style={{ marginBottom:16, position:"relative" }}>
+            <img src={photoUrl} style={{ width:"100%", borderRadius:12, maxHeight:200, objectFit:"cover" }} />
+            <button onClick={() => setPhotoUrl(null)} style={{ position:"absolute", top:8, right:8, background:"rgba(0,0,0,0.5)", border:"none", borderRadius:8, padding:"5px 10px", fontSize:11, color:C.white, cursor:"pointer", fontWeight:700 }}>重拍</button>
+          </div>
+        )}
+
+        <button onClick={() => setStep(2)} style={{ width:"100%", background:`linear-gradient(135deg,${C.blue},${C.blueMid})`, border:"none", borderRadius:14, padding:15, color:C.white, fontSize:15, fontWeight:800, cursor:"pointer", marginBottom:10 }}>下一步，確認結案 →</button>
+        <button onClick={onClose} style={{ width:"100%", background:"transparent", border:`1.5px solid ${C.grayBorder}`, borderRadius:14, padding:13, color:C.textSub, fontSize:14, cursor:"pointer" }}>取消</button>
+      </div>
+    </div>
+    {showSig && !sigData && (
+      <SignaturePad onSave={(data) => { setSigData(data); setShowSig(false); }} onCancel={() => setShowSig(false)} customer={`${c.customer} ${c.name}`} />
+    )}
+    </>
+  );
+}
+
+function RejectModal({ c, onClose, onConfirm }) {
+  const [note, setNote] = useState("");
+  const alreadyAccepted = c.status==="待取件" || c.status==="已接單";
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(20,40,80,0.55)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }} onClick={onClose}>
+      <div style={{ background:C.white, borderRadius:22, padding:26, width:"100%", maxWidth:360 }} onClick={e=>e.stopPropagation()}>
+        <div style={{ fontSize:40, textAlign:"center", marginBottom:10 }}>↩️</div>
+        <div style={{ fontWeight:900, fontSize:17, color:C.text, textAlign:"center", marginBottom:6 }}>
+          {alreadyAccepted ? "退回這筆案件？" : "無法接單？"}
+        </div>
+        <div style={{ fontSize:13, color:C.textSub, textAlign:"center", marginBottom:16 }}>
+          {c.customer}・退回後將回到隊長的待指派清單
+        </div>
+        <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="備註原因（選填）" rows={2}
+          style={{ width:"100%", background:C.grayLight, border:`1.5px solid ${C.grayBorder}`, borderRadius:12, padding:"10px 14px", color:C.text, fontSize:14, boxSizing:"border-box", outline:"none", resize:"none", fontFamily:"inherit", marginBottom:18 }}/>
+        <button onClick={() => onConfirm(note.trim())}
+          style={{ width:"100%", background:`linear-gradient(135deg,${C.orange},#F09040)`, border:"none", borderRadius:14, padding:15, color:C.white, fontSize:15, fontWeight:800, cursor:"pointer", marginBottom:10 }}>確認退回</button>
+        <button onClick={onClose} style={{ width:"100%", background:"transparent", border:`1.5px solid ${C.grayBorder}`, borderRadius:14, padding:13, color:C.textSub, fontSize:14, cursor:"pointer" }}>取消</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Overflow button ─────────────────────────────────────
+function OverflowBtn({ items }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position:"relative" }}>
+      <button onClick={e=>{ e.stopPropagation(); setOpen(o=>!o); }} style={{ background:open?C.grayLight:"transparent", border:`1px solid ${open?C.grayBorder:"transparent"}`, borderRadius:8, width:28, height:28, cursor:"pointer", color:C.gray, fontSize:16, display:"flex", alignItems:"center", justifyContent:"center" }}>···</button>
+      {open && (
+        <div style={{ position:"absolute", top:32, right:0, background:C.white, border:`1px solid ${C.grayBorder}`, borderRadius:12, boxShadow:"0 4px 20px rgba(0,0,0,0.12)", zIndex:50, minWidth:140, overflow:"hidden" }}>
+          {items.map((item,i) => (
+            <button key={i} onClick={e=>{ e.stopPropagation(); setOpen(false); item.action(); }} style={{ width:"100%", background:"transparent", border:"none", padding:"12px 16px", color:item.color||C.textSub, fontSize:13, fontWeight:600, cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:8 }}>
+              {item.icon} {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Case card (shared between 我的案件 and 全員) ─────────
+function CaseCard({ c, showRoute=false, routeNum=null, sortMode=false, onMoveUp, onMoveDown, onDragStart, onDragMove, onDragEnd, isDragging=false, total, idx, onAccept, onPickup, onReject, onUndo, readOnly=false, onSession }) {
+  const cfg = STATUS_CFG[c.status] || {};
+  const isDone = c.status === "已取件";
+  const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapAddr(c.address)}`;
+
+  return (
+    <div style={{ background:C.white, borderRadius:18, marginBottom:12, boxShadow:isDragging?"0 6px 20px rgba(43,123,232,0.3)":C.shadow, border:`1.5px solid ${isDragging?C.blue:C.grayBorder}`, overflow:"hidden", transform:isDragging?"scale(1.02)":"none", transition:isDragging?"none":"transform 0.15s, box-shadow 0.15s", opacity:isDragging?0.9:1 }}>
+      <div style={{ height:4, background:`linear-gradient(90deg,${cfg.color},${cfg.color}55)` }}/>
+      <div style={{ display:"flex" }}>
+        {/* Sort controls: drag handle if onDragStart provided, else arrows */}
+        {sortMode && !isDone && onDragStart && (
+          <div
+            onTouchStart={onDragStart} onTouchMove={onDragMove} onTouchEnd={onDragEnd}
+            onMouseDown={onDragStart} onMouseMove={onDragMove} onMouseUp={onDragEnd} onMouseLeave={onDragEnd}
+            style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"0 10px", borderRight:`1px solid ${C.grayBorder}`, gap:6, minWidth:40, cursor:"grab", touchAction:"none" }}>
+            <div style={{ background:cfg.soft, color:cfg.color, fontWeight:900, fontSize:12, borderRadius:8, width:22, height:22, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:2 }}>{idx+1}</div>
+            {[0,1,2].map(i => <div key={i} style={{ width:20, height:3, background:cfg.color+"55", borderRadius:2 }} />)}
+          </div>
+        )}
+        {sortMode && !isDone && !onDragStart && (
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"0 6px", borderRight:`1px solid ${C.grayBorder}`, gap:4, minWidth:38 }}>
+            <button onClick={onMoveUp} disabled={idx===0} style={{ background:"none", border:"none", fontSize:20, color:idx===0?C.grayBorder:cfg.color, cursor:idx===0?"default":"pointer", padding:"2px 6px" }}>▲</button>
+            <div style={{ background:cfg.soft, color:cfg.color, fontWeight:900, fontSize:12, borderRadius:8, width:22, height:22, display:"flex", alignItems:"center", justifyContent:"center" }}>{idx+1}</div>
+            <button onClick={onMoveDown} disabled={idx===total-1} style={{ background:"none", border:"none", fontSize:20, color:idx===total-1?C.grayBorder:cfg.color, cursor:idx===total-1?"default":"pointer", padding:"2px 6px" }}>▼</button>
+          </div>
+        )}
+        <div style={{ flex:1, padding:"13px 14px" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+            <div style={{ flex:1 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5 }}>
+                {showRoute && !isDone && routeNum!==null && (
+                  <div style={{ background:cfg.color, color:C.white, fontWeight:900, fontSize:11, borderRadius:8, width:22, height:22, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{routeNum}</div>
+                )}
+                {c.status==="已指派" && !readOnly && <div style={{ width:7, height:7, borderRadius:"50%", background:C.pink, flexShrink:0 }}/>}
+                <span style={{ background:cfg.soft, color:cfg.color, fontSize:11, padding:"3px 9px", borderRadius:20, fontWeight:700, border:`1px solid ${cfg.light}` }}>{cfg.icon} {cfg.label}</span>
+                <span style={{ color:C.textMuted, fontSize:11 }}>{c.pickup_time}</span>
+
+              </div>
+              <div style={{ fontSize:20, fontWeight:900, color:C.text, lineHeight:1.2 }}>{c.customer}</div>
+              <div style={{ fontSize:13, color:C.textSub, marginTop:2 }}>{c.name}</div>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:5, marginLeft:10 }}>
+              {!readOnly && (c.status==="已指派"||c.status==="待取件"||c.status==="已接單"||c.status==="已取件") && (
+                <OverflowBtn items={
+                  c.status==="已指派" ? [{ icon:"⚠️", label:"無法接單", color:C.orange, action:onReject }]
+                  : c.status==="已取件" ? [{ icon:"↩️", label:"撤銷結案", color:C.orange, action:onUndo }]
+                  : [{ icon:"↩️", label:"退回給隊長", color:C.orange, action:onReject }]
+                } />
+              )}
+              <div style={{ background:cfg.soft, border:`1px solid ${cfg.light}`, borderRadius:10, padding:"5px 11px", textAlign:"center" }}>
+                <div style={{ color:cfg.color, fontWeight:900, fontSize:20, lineHeight:1 }}>{net(c)}</div>
+                <div style={{ color:cfg.color, fontSize:10 }}>件</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ borderTop:`1px dashed ${C.grayBorder}`, paddingTop:10, marginBottom:12 }}>
+            <div style={{ display:"flex", gap:6, marginBottom:6, alignItems:"flex-start" }}>
+              <span style={{ fontSize:13, flexShrink:0 }}>📍</span>
+              <span style={{ fontSize:13, color:C.textSub, lineHeight:1.5, flex:1 }}>{c.address}</span>
+              <a href={navUrl} target="_blank" rel="noreferrer"
+                style={{ flexShrink:0, background:C.blueSoft, border:`1px solid ${C.blueLight}`, borderRadius:8, padding:"3px 8px", color:C.blue, fontSize:11, fontWeight:700, textDecoration:"none", marginLeft:6, whiteSpace:"nowrap" }}>
+                🗺️ 導航
+              </a>
+            </div>
+            <div style={{ display:"flex", gap:6, marginBottom:c.remark?6:0 }}><span style={{ fontSize:13 }}>📞</span><a href={`tel:${c.phone}`} style={{ fontSize:13, color:C.blue, fontWeight:700, textDecoration:"none" }}>{c.phone}</a></div>
+            {c.remark && <div style={{ display:"flex", gap:6 }}><span style={{ fontSize:13 }}>💬</span><span style={{ fontSize:13, color:C.textSub }}>{c.remark}</span></div>}
+          </div>
+
+          {!readOnly && c.status!=="已取件" && (
+            <div style={{ display:"flex", gap:8 }}>
+              {c.status==="已指派" && <button onClick={onAccept} style={{ flex:1, background:`linear-gradient(135deg,${C.blue},${C.blueMid})`, border:"none", borderRadius:12, padding:"12px", color:C.white, fontSize:14, fontWeight:800, cursor:"pointer", boxShadow:C.shadowBlue }}>🙋 確認接單</button>}
+              {(c.status==="待取件"||c.status==="已接單") && <button onClick={onPickup} style={{ flex:1, background:`linear-gradient(135deg,${C.navy},${C.blue})`, border:"none", borderRadius:12, padding:"12px", color:C.white, fontSize:14, fontWeight:800, cursor:"pointer", boxShadow:C.shadowBlue }}>📦 確認取件</button>}
+            </div>
+          )}
+          {c.status==="已取件" && (
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              <div style={{ display:"flex", gap:8 }}>
+                <div style={{ flex:1, background:C.greenLight, borderRadius:10, padding:"8px", textAlign:"center" }}><div style={{ color:C.green, fontWeight:900, fontSize:18 }}>{c.pcs_actual??net(c)}</div><div style={{ color:C.green, fontSize:10 }}>實際件數</div></div>
+                <div style={{ flex:1, background:C.greenLight, borderRadius:10, padding:"8px", textAlign:"center" }}><div style={{ color:C.green, fontWeight:700, fontSize:14 }}>{c.pickup_at}</div><div style={{ color:C.green, fontSize:10 }}>取件時間</div></div>
+              </div>
+              {(c.sig_url || c.photo_url) && (
+                <div style={{ display:"flex", gap:8 }}>
+                  {c.sig_url && (
+                    <div style={{ flex:1, background:C.blueSoft, border:`1px solid ${C.blueLight}`, borderRadius:10, padding:"8px 10px", display:"flex", alignItems:"center", gap:6 }}>
+                      <span style={{ fontSize:16 }}>✍️</span>
+                      <div>
+                        <div style={{ color:C.blue, fontWeight:700, fontSize:12 }}>已簽收</div>
+                        <div style={{ color:C.textMuted, fontSize:10 }}>客戶親簽</div>
+                      </div>
+                    </div>
+                  )}
+                  {c.photo_url && (
+                    <div style={{ flex:1, background:C.greenSoft, border:`1px solid ${C.greenLight}`, borderRadius:10, overflow:"hidden", position:"relative", minHeight:56 }}>
+                      <img src={c.photo_url} style={{ width:"100%", height:56, objectFit:"cover" }} />
+                      <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"rgba(47,158,94,0.75)", padding:"2px 6px", display:"flex", alignItems:"center", gap:4 }}>
+                        <span style={{ fontSize:11 }}>📷</span>
+                        <span style={{ color:C.white, fontSize:10, fontWeight:700 }}>已拍照</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── My Cases Tab ────────────────────────────────────────
+function MyCasesTab({ cases, me, onAccept, onPickup, onReject, onUndo, onReorder, onSession }) {
+  const [section, setSection] = useState(0);
+  const [sortMode, setSortMode] = useState(false);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const listRef = useRef(null);
+  const myCases = cases.filter(c => c.driver_id === me);
+  const sections = [
+    { label:"新案件", color:C.blue,  cases: myCases.filter(c=>c.status==="已指派") },
+    { label:"待取件", color:C.navy,  cases: myCases.filter(c=>c.status==="待取件"||c.status==="已接單").sort((a,b)=>a.order-b.order) },
+    { label:"已取件", color:C.green, cases: myCases.filter(c=>c.status==="已取件") },
+  ];
+  const cur = sections[section];
+
+  const getClientY = e => (e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY);
+  const handleDragStart = (idx) => (e) => { setDragIdx(idx); setOverIdx(idx); };
+  const handleDragMove = (e) => {
+    if (dragIdx===null || !listRef.current) return;
+    e.preventDefault();
+    const y = getClientY(e);
+    const cardEls = Array.from(listRef.current.children);
+    let closest = overIdx, minDist = Infinity;
+    cardEls.forEach((el,i) => {
+      const rect = el.getBoundingClientRect();
+      const dist = Math.abs(y - (rect.top+rect.height/2));
+      if (dist < minDist) { minDist = dist; closest = i; }
+    });
+    if (closest !== overIdx) setOverIdx(closest);
+  };
+  const handleDragEnd = () => {
+    if (dragIdx!==null && overIdx!==null && dragIdx!==overIdx) onReorder(me, dragIdx, overIdx);
+    setDragIdx(null); setOverIdx(null);
+  };
+
+  return (
+    <>
+      <div style={{ background:C.white, padding:"10px 14px", borderBottom:`1px solid ${C.grayBorder}`, display:"flex", gap:8 }}>
+        {sections.map((s,i) => (
+          <button key={i} onClick={() => { setSection(i); setSortMode(false); }}
+            style={{ flex:1, background:section===i?s.color:C.grayLight, border:"none", borderRadius:10, padding:"9px 4px", color:section===i?C.white:C.gray, fontWeight:section===i?800:500, fontSize:12, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:4 }}>
+            {s.label}
+            {s.cases.length>0 && <span style={{ background:section===i?"rgba(255,255,255,0.3)":C.grayBorder, borderRadius:8, fontSize:11, padding:"0 5px", fontWeight:800 }}>{s.cases.length}</span>}
+          </button>
+        ))}
+      </div>
+      <div style={{ padding:"14px 12px 80px" }}>
+        {section===1 && cur.cases.length>0 && (
+          <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+            {cur.cases.length>1 && (
+              <button onClick={() => setSortMode(m=>!m)}
+                style={{ flex:1, background:sortMode?C.blue:C.grayLight, border:`1.5px solid ${sortMode?C.blue:C.grayBorder}`, borderRadius:10, padding:"10px 6px", color:sortMode?C.white:C.gray, fontSize:12, fontWeight:700, cursor:"pointer" }}>
+                {sortMode?"✅ 完成排序":"⇅ 排順序"}
+              </button>
+            )}
+            {!sortMode && (() => {
+              const addrs = cur.cases.map(c=>c.address);
+              const destination = mapAddr(addrs[addrs.length-1]);
+              const waypoints = addrs.slice(0,-1).map(a=>mapAddr(a)).join("|");
+              const routeUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}` + (waypoints?`&waypoints=${waypoints}`:"") + "&travelmode=driving";
+              return (
+                <a href={routeUrl} target="_blank" rel="noreferrer"
+                  style={{ flex:2, background:`linear-gradient(135deg,${C.blue},${C.blueMid})`, borderRadius:10, padding:"10px 6px", color:C.white, fontSize:12, fontWeight:800, textDecoration:"none", textAlign:"center", display:"flex", alignItems:"center", justifyContent:"center", gap:5, boxShadow:C.shadowBlue }}>
+                  🗺️ 一鍵全程導航
+                </a>
+              );
+            })()}
+          </div>
+        )}
+        {cur.cases.length===0 && <div style={{ textAlign:"center", padding:"60px 20px" }}><div style={{ fontSize:44 }}>📭</div><div style={{ color:C.textMuted, fontSize:14, marginTop:10 }}>目前沒有{cur.label}案件</div></div>}
+        <div ref={section===1 ? listRef : null}>
+          {cur.cases.map((c,idx) => (
+            <CaseCard key={c.id} c={c} idx={idx} total={cur.cases.length}
+              sortMode={sortMode}
+              isDragging={dragIdx===idx}
+              onDragStart={section===1 ? handleDragStart(idx) : undefined}
+              onDragMove={section===1 ? handleDragMove : undefined}
+              onDragEnd={section===1 ? handleDragEnd : undefined}
+              onAccept={() => onAccept(c.id)}
+              onPickup={() => onPickup(c.id)}
+              onReject={() => onReject(c.id)}
+              onUndo={() => onUndo(c.id)} />
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Team Tab ────────────────────────────────────────────
+function TeamTab({ cases, me, onReorder, onSession }) {
+  const [driverIdx, setDriverIdx] = useState(0);
+  const [sortMode, setSortMode] = useState(false);
+  const TEAM_DRIVERS = DRIVERS.filter(d => d.id !== me);
+  const driver = TEAM_DRIVERS[driverIdx];
+
+  const driverCases = cases
+    .filter(c => c.driver_id === driver.id && c.status !== "待指派")
+    .sort((a,b) => a.order - b.order);
+
+  const sections = [
+    { label:"尚未接單", color:C.blue,  cases: driverCases.filter(c=>c.status==="已指派") },
+    { label:"待取件",   color:C.navy,  cases: driverCases.filter(c=>c.status==="待取件"||c.status==="已接單") },
+    { label:"已取件",   color:C.green, cases: driverCases.filter(c=>c.status==="已取件") },
+  ];
+  const [section, setSection] = useState(0);
+
+  const cur = sections[section];
+  const activeCount = driverCases.filter(c=>c.status!=="已取件").length;
+  const doneCount = driverCases.filter(c=>c.status==="已取件").length;
+
+  return (
+    <>
+      {/* Driver selector */}
+      <div style={{ background:C.white, borderBottom:`1px solid ${C.grayBorder}` }}>
+        <div style={{ display:"flex" }}>
+          {TEAM_DRIVERS.map((d,i) => {
+            const dc = cases.filter(c=>c.driver_id===d.id&&c.status!=="待指派");
+            const alert = dc.some(c=>c.status==="已指派"&&c.wait_min>=5);
+            return (
+              <button key={d.id} onClick={() => { setDriverIdx(i); setSection(0); setSortMode(false); }}
+                style={{ flex:1, background:driverIdx===i?C.blueSoft:"transparent", border:"none", borderBottom:`2.5px solid ${driverIdx===i?C.blue:"transparent"}`, padding:"12px 4px", cursor:"pointer", position:"relative" }}>
+                {alert && <div style={{ position:"absolute", top:6, right:"calc(50% - 14px)", width:7, height:7, borderRadius:"50%", background:C.red, border:"1.5px solid white" }}/>}
+                <div style={{ width:36, height:36, background:driverIdx===i?C.blue:C.grayLight, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", color:driverIdx===i?C.white:C.gray, fontWeight:900, fontSize:16, margin:"0 auto 4px" }}>{d.name[0]}</div>
+                <div style={{ fontSize:12, fontWeight:driverIdx===i?800:500, color:driverIdx===i?C.blue:C.gray }}>{d.name}</div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Driver summary bar */}
+        <div style={{ background:driverIdx===0?C.blueSoft:driverIdx===1?C.blueSoft:C.blueSoft, padding:"8px 16px", display:"flex", alignItems:"center", gap:10, borderTop:`1px solid ${C.grayBorder}` }}>
+          <a href={`tel:${driver.phone}`}
+            style={{ background:C.blue, borderRadius:8, padding:"6px 12px", color:C.white, fontSize:12, fontWeight:700, textDecoration:"none", display:"flex", alignItems:"center", gap:4 }}>
+            📞 聯絡{driver.name}
+          </a>
+          <div style={{ flex:1, fontSize:11, color:C.textSub }}>
+            進行中 <strong style={{ color:C.blue }}>{activeCount}</strong> 件・已完成 <strong style={{ color:C.green }}>{doneCount}</strong> 件
+          </div>
+        </div>
+
+        {/* Section pills */}
+        <div style={{ display:"flex", gap:8, padding:"10px 14px" }}>
+          {sections.map((s,i) => (
+            <button key={i} onClick={() => { setSection(i); setSortMode(false); }}
+              style={{ flex:1, background:section===i?s.color:C.grayLight, border:"none", borderRadius:10, padding:"9px 4px", color:section===i?C.white:C.gray, fontWeight:section===i?800:500, fontSize:12, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:4 }}>
+              {s.label}
+              {s.cases.length>0 && <span style={{ background:section===i?"rgba(255,255,255,0.3)":C.grayBorder, borderRadius:8, fontSize:11, padding:"0 5px", fontWeight:800 }}>{s.cases.length}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding:"14px 12px 80px" }}>
+        {section===1 && cur.cases.length>0 && (
+          <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+            {cur.cases.length>1 && (
+              <button onClick={() => setSortMode(m=>!m)}
+                style={{ flex:1, background:sortMode?C.blue:C.grayLight, border:`1.5px solid ${sortMode?C.blue:C.grayBorder}`, borderRadius:10, padding:"10px 6px", color:sortMode?C.white:C.gray, fontSize:12, fontWeight:700, cursor:"pointer" }}>
+                {sortMode?"✅ 完成排序":"⇅ 調整順序"}
+              </button>
+            )}
+            {!sortMode && (
+              <a href={"https://www.google.com/maps/dir/?api=1&destination=" + mapAddr(cur.cases[cur.cases.length-1].address) + (cur.cases.length>1 ? "&waypoints=" + cur.cases.slice(0,-1).map(c=>mapAddr(c.address)).join("|") : "") + "&travelmode=driving"}
+                target="_blank" rel="noreferrer"
+                style={{ flex:2, background:`linear-gradient(135deg,${C.blue},${C.blueMid})`, borderRadius:10, padding:"10px 6px", color:C.white, fontSize:12, fontWeight:800, textDecoration:"none", textAlign:"center", display:"flex", alignItems:"center", justifyContent:"center", gap:5, boxShadow:C.shadowBlue }}>
+                🗺️ 一鍵開啟完整路線
+              </a>
+            )}
+          </div>
+        )}
+        {cur.cases.length===0 && <div style={{ textAlign:"center", padding:"60px 20px" }}><div style={{ fontSize:44 }}>📭</div><div style={{ color:C.textMuted, fontSize:14, marginTop:10 }}>目前沒有{sections[section].label}案件</div></div>}
+        {section!==1 ? cur.cases.map((c,idx) => (
+          <CaseCard key={c.id} c={c} idx={idx} total={cur.cases.length}
+            showRoute={false} sortMode={false} readOnly={true} onSession={onSession} />
+        )) : (() => {
+          const groups = [
+            { label:"🌅 上午", key:"上午", cases: cur.cases.filter(c=>c.session==="上午") },
+            { label:"🌆 下午", key:"下午", cases: cur.cases.filter(c=>c.session==="下午") },
+            { label:"⏳ 未分類", key:null,  cases: cur.cases.filter(c=>!c.session) },
+          ].filter(g=>g.cases.length>0);
+          return groups.map(g => (
+            <div key={g.key??'none'}>
+              <div style={{ display:"flex", alignItems:"center", gap:6, margin:"6px 0 8px", padding:"6px 10px", background:g.key==="上午"?"#FEF9EC":g.key==="下午"?"#EFF6FF":"#F4F5F7", borderRadius:8 }}>
+                <span style={{ fontSize:13, fontWeight:800, color:g.key==="上午"?"#B45309":g.key==="下午"?"#1D4ED8":C.textMuted }}>{g.label}</span>
+                <span style={{ fontSize:11, color:C.textMuted }}>{g.cases.length} 件</span>
+              </div>
+              {g.cases.map((c) => { const i = cur.cases.indexOf(c); return (
+                <CaseCard key={c.id} c={c} idx={i} total={cur.cases.length}
+                  showRoute={true} routeNum={i+1} sortMode={sortMode} readOnly={true}
+                  onMoveUp={() => onReorder(driver.id, i, i-1, section)}
+                  onMoveDown={() => onReorder(driver.id, i, i+1, section)}
+                  onSession={onSession} />
+              );})}
+            </div>
+          ));
+        })()}
+      </div>
+    </>
+  );
+}
+
+// ── Pending Tab ─────────────────────────────────────────
+function PendingCard({ c, selected, onToggle, onAssign, onSession, isAfternoon=false }) {
+  return (
+    <div onClick={onToggle}
+      style={{ background:selected?C.blueSoft:c.returned?"#FFF5F5":C.white, borderRadius:16, marginBottom:10, border:`1.5px solid ${selected?C.blue:c.returned?C.red:C.grayBorder}`, overflow:"hidden", cursor:"pointer", boxShadow:C.shadow, transition:"all 0.12s" }}>
+      <div style={{ height:4, background:selected?C.blue:c.returned?C.red:isAfternoon?"#6366F1":C.orange }}/>
+      <div style={{ padding:"12px 14px" }}>
+        <div style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
+          <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${selected?C.blue:C.grayBorder}`, background:selected?C.blue:C.white, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginTop:2 }}>
+            {selected && <span style={{ color:C.white, fontSize:12, fontWeight:900 }}>✓</span>}
+          </div>
+          <div style={{ flex:1, minWidth:0 }}>
+            {c.returned && (
+              <div style={{ display:"inline-block", background:C.redLight, color:C.red, fontSize:11, fontWeight:800, padding:"2px 9px", borderRadius:20, marginBottom:6 }}>
+                ↩️ 司機退回
+              </div>
+            )}
+            <div style={{ fontSize:19, fontWeight:900, color:C.text, lineHeight:1.2, marginBottom:2 }}>{c.customer}</div>
+            <div style={{ fontSize:12, color:C.textSub, marginBottom:8 }}>{c.name}</div>
+            <div style={{ display:"flex", gap:6, marginBottom:4, alignItems:"flex-start" }}>
+              <span style={{ fontSize:12, flexShrink:0 }}>📍</span>
+              <span style={{ fontSize:12, color:C.textSub, lineHeight:1.4 }}>{c.address}</span>
+              <a href={`https://www.google.com/maps/dir/?api=1&destination=${mapAddr(c.address)}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}
+                style={{ flexShrink:0, background:C.blueSoft, border:`1px solid ${C.blueLight}`, borderRadius:6, padding:"1px 6px", color:C.blue, fontSize:10, fontWeight:700, textDecoration:"none", marginLeft:4 }}>
+                🗺️
+              </a>
+            </div>
+            <div style={{ display:"flex", gap:12 }}>
+              <span style={{ fontSize:11, color:C.textMuted }}>🕐 {c.pickup_time}</span>
+              <span style={{ fontSize:11, color:C.orange, fontWeight:700 }}>📦 {net(c)} 件{c.cancel_pcs>0?` (取消${c.cancel_pcs})`:""}</span>
+            </div>
+            {c.remark && <div style={{ fontSize:11, color:c.returned?C.red:C.textSub, marginTop:4 }}>💬 {c.remark}</div>}
+          </div>
+          {/* Move to PM / back to top button */}
+          <button onClick={e=>{ e.stopPropagation(); onSession(c.id, isAfternoon?null:"下午"); }}
+            style={{ flexShrink:0, background:isAfternoon?"#EEF2FF":"#F4F5F7", border:`1px solid ${isAfternoon?"#A5B4FC":C.grayBorder}`, borderRadius:8, padding:"5px 8px", fontSize:11, fontWeight:700, color:isAfternoon?"#4338CA":C.textMuted, cursor:"pointer", marginTop:2 }}>
+            {isAfternoon?"↑ 移回":"🌆 下午"}
+          </button>
+        </div>
+        <button onClick={e=>{ e.stopPropagation(); onAssign([c]); }}
+          style={{ width:"100%", background:`linear-gradient(135deg,${C.blue},${C.blueMid})`, border:"none", borderRadius:10, padding:"11px", color:C.white, fontSize:14, fontWeight:800, cursor:"pointer", boxShadow:C.shadowBlue, marginTop:10 }}>
+          指派給司機
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PendingTab({ cases, onAssign, onSession }) {
+  const [selIds, setSelIds] = useState([]);
+  const [pmOpen, setPmOpen] = useState(false);
+  const pending = cases.filter(c => c.status==="待指派");
+  const topCases = pending.filter(c => c.session!=="下午").sort((a,b) => (b.returned?1:0) - (a.returned?1:0));
+  const pmCases  = pending.filter(c => c.session==="下午");
+  const toggle = id => setSelIds(ids => ids.includes(id)?ids.filter(i=>i!==id):[...ids,id]);
+  const selCases = pending.filter(c => selIds.includes(c.id));
+  const topSelected = topCases.filter(c=>selIds.includes(c.id));
+
+  return (
+    <div style={{ padding:"14px 12px 100px" }}>
+
+      {/* Batch bar */}
+      {selIds.length>1 && (
+        <div style={{ background:C.blueSoft, border:`1.5px solid ${C.blue}`, borderRadius:14, padding:"10px 14px", marginBottom:12, display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ flex:1, color:C.blue, fontWeight:700, fontSize:13 }}>已選 {selIds.length} 件</div>
+          <button onClick={() => onAssign(selCases)} style={{ background:C.blue, border:"none", borderRadius:10, padding:"8px 14px", color:C.white, fontSize:13, fontWeight:800, cursor:"pointer" }}>批次指派</button>
+        </div>
+      )}
+
+      {pending.length===0 && (
+        <div style={{ textAlign:"center", padding:"80px 20px" }}>
+          <div style={{ fontSize:52 }}>🎉</div>
+          <div style={{ fontWeight:800, fontSize:16, color:C.text, marginTop:12 }}>所有案件都已指派！</div>
+        </div>
+      )}
+
+      {/* Select all bar */}
+      {topCases.length>1 && (
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12, padding:"9px 14px", background:C.white, borderRadius:12, border:`1.5px solid ${C.grayBorder}` }}>
+          <button onClick={() => setSelIds(topSelected.length===topCases.length ? selIds.filter(id=>!topCases.find(c=>c.id===id)) : [...new Set([...selIds,...topCases.map(c=>c.id)])])}
+            style={{ display:"flex", alignItems:"center", gap:7, background:"none", border:"none", cursor:"pointer", padding:0 }}>
+            <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${topSelected.length===topCases.length?C.blue:C.grayBorder}`, background:topSelected.length===topCases.length?C.blue:C.white, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              {topSelected.length===topCases.length && <span style={{ color:C.white, fontSize:12, fontWeight:900 }}>✓</span>}
+              {topSelected.length>0 && topSelected.length<topCases.length && <span style={{ color:C.blue, fontSize:15, lineHeight:1 }}>−</span>}
+            </div>
+            <span style={{ fontSize:13, fontWeight:700, color:topSelected.length===topCases.length?C.blue:C.textSub }}>
+              {topSelected.length===topCases.length?"取消全選":"全選"}
+            </span>
+          </button>
+          <span style={{ fontSize:12, color:C.textMuted, flex:1 }}>
+            {topSelected.length>0?`已選 ${topSelected.length} / ${topCases.length} 件`:"可多選批次指派"}
+          </span>
+        </div>
+      )}
+
+      {/* Top cases (未分類 + 上午) */}
+      {topCases.map(c => (
+        <PendingCard key={c.id} c={c}
+          selected={selIds.includes(c.id)}
+          onToggle={() => toggle(c.id)}
+          onAssign={onAssign}
+          onSession={onSession}
+          isAfternoon={false} />
+      ))}
+
+      {/* 下午 collapsible banner */}
+      {pmCases.length>0 && (
+        <div style={{ marginTop:4 }}>
+          <button onClick={() => setPmOpen(o=>!o)}
+            style={{ width:"100%", background:"linear-gradient(135deg,#4338CA,#6366F1)", border:"none", borderRadius:14, padding:"14px 18px", display:"flex", alignItems:"center", gap:10, cursor:"pointer", marginBottom: pmOpen?12:0 }}>
+            <span style={{ fontSize:18 }}>🌆</span>
+            <span style={{ color:"#fff", fontWeight:800, fontSize:15, flex:1, textAlign:"left" }}>下午派件</span>
+            <span style={{ background:"rgba(255,255,255,0.2)", color:"#fff", fontSize:12, fontWeight:700, padding:"3px 10px", borderRadius:10 }}>{pmCases.length} 件</span>
+            <span style={{ color:"rgba(255,255,255,0.8)", fontSize:16, transition:"transform 0.2s", display:"inline-block", transform:pmOpen?"rotate(180deg)":"rotate(0deg)" }}>▼</span>
+          </button>
+          {pmOpen && pmCases.map(c => (
+            <PendingCard key={c.id} c={c}
+              selected={selIds.includes(c.id)}
+              onToggle={() => toggle(c.id)}
+              onAssign={onAssign}
+              onSession={onSession}
+              isAfternoon={true} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── App ─────────────────────────────────────────────────
+// ── Trip End Modal (回程結算：里程／加油／抵達時間) ─────────
+function TripEndModal({ startMileage, vehicle, onClose, onConfirm }) {
+  const [endMileage, setEndMileage] = useState("");
+  const [fueled, setFueled] = useState(null); // true / false
+  const [fuelAmount, setFuelAmount] = useState("");
+
+  const distance = (endMileage && startMileage) ? (parseInt(endMileage,10) - parseInt(startMileage,10)) : null;
+  const canSubmit = endMileage.trim() !== "" && fueled !== null && (fueled ? fuelAmount.trim() !== "" : true);
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(20,40,80,0.55)", zIndex:200, display:"flex", alignItems:"flex-end" }} onClick={onClose}>
+      <div style={{ background:C.white, borderRadius:"22px 22px 0 0", width:"100%", padding:"20px 20px 44px", maxHeight:"92vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+        <div style={{ width:40, height:5, background:C.grayBorder, borderRadius:3, margin:"0 auto 16px" }} />
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:18 }}>
+          <div style={{ background:C.blueSoft, borderRadius:12, width:40, height:40, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🏁</div>
+          <div>
+            <div style={{ fontWeight:900, fontSize:16, color:C.text }}>回程結算</div>
+            <div style={{ fontSize:11, color:C.textSub }}>🚐 {vehicle}・出發里程 {startMileage}</div>
+          </div>
+        </div>
+
+        <div style={{ fontSize:12, color:C.textSub, fontWeight:600, marginBottom:8 }}>🛣️ 回程里程數</div>
+        <input value={endMileage} onChange={e=>setEndMileage(e.target.value.replace(/[^0-9]/g,""))}
+          placeholder="例：45410" inputMode="numeric"
+          style={{ width:"100%", background:C.grayLight, border:`1.5px solid ${C.grayBorder}`, borderRadius:12, padding:"12px 14px", color:C.text, fontSize:16, fontWeight:700, boxSizing:"border-box", outline:"none", marginBottom:8, fontFamily:"inherit" }} />
+        {distance !== null && !isNaN(distance) && (
+          <div style={{ fontSize:12, color:distance>=0?C.blue:C.red, fontWeight:700, marginBottom:16 }}>
+            {distance>=0 ? `今日行駛約 ${distance} 公里` : "⚠️ 回程里程小於出發里程，請確認"}
+          </div>
+        )}
+        {(distance === null) && <div style={{ marginBottom:16 }} />}
+
+        <div style={{ fontSize:12, color:C.textSub, fontWeight:600, marginBottom:8 }}>⛽ 今天有加油嗎？</div>
+        <div style={{ display:"flex", gap:8, marginBottom:16 }}>
+          <button onClick={() => setFueled(true)}
+            style={{ flex:1, background:fueled===true?C.blueSoft:C.grayLight, border:`1.5px solid ${fueled===true?C.blue:C.grayBorder}`, borderRadius:12, padding:"12px", color:fueled===true?C.blue:C.textSub, fontSize:14, fontWeight:700, cursor:"pointer" }}>
+            ⛽ 有加油
+          </button>
+          <button onClick={() => { setFueled(false); setFuelAmount(""); }}
+            style={{ flex:1, background:fueled===false?C.grayLight:C.grayLight, border:`1.5px solid ${fueled===false?C.gray:C.grayBorder}`, borderRadius:12, padding:"12px", color:C.textSub, fontSize:14, fontWeight:700, cursor:"pointer" }}>
+            沒加油
+          </button>
+        </div>
+
+        {fueled === true && (
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:12, color:C.textSub, fontWeight:600, marginBottom:8 }}>💰 加油金額</div>
+            <div style={{ display:"flex", alignItems:"center", background:C.grayLight, border:`1.5px solid ${C.grayBorder}`, borderRadius:12, padding:"0 14px" }}>
+              <span style={{ color:C.textMuted, fontSize:15, marginRight:6 }}>$</span>
+              <input value={fuelAmount} onChange={e=>setFuelAmount(e.target.value.replace(/[^0-9]/g,""))}
+                placeholder="例：500" inputMode="numeric"
+                style={{ flex:1, background:"transparent", border:"none", padding:"12px 0", color:C.text, fontSize:16, fontWeight:700, outline:"none", fontFamily:"inherit" }} />
+              <span style={{ color:C.textMuted, fontSize:13 }}>元</span>
+            </div>
+          </div>
+        )}
+
+        <div style={{ background:C.blueSoft, borderRadius:10, padding:"10px 14px", marginBottom:20, display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:14 }}>🕐</span>
+          <span style={{ fontSize:12, color:C.textSub }}>抵達時間將自動記錄為送出當下時間</span>
+        </div>
+
+        <button onClick={() => canSubmit && onConfirm({ endMileage, fueled, fuelAmount: fueled?fuelAmount:0, arrivalTime: nowStr() })}
+          disabled={!canSubmit}
+          style={{ width:"100%", background:canSubmit?`linear-gradient(135deg,${C.green},#27855A)`:C.grayLight, border:"none", borderRadius:14, padding:15, color:canSubmit?C.white:C.textMuted, fontSize:16, fontWeight:800, cursor:canSubmit?"pointer":"default", marginBottom:10 }}>
+          ✅ 確認送出
+        </button>
+        <button onClick={onClose} style={{ width:"100%", background:"transparent", border:`1.5px solid ${C.grayBorder}`, borderRadius:14, padding:13, color:C.textSub, fontSize:14, cursor:"pointer" }}>取消</button>
+      </div>
+    </div>
+  );
+}
+
+function MainApp({ me, meName, role, vehicle, startMileage, onLogout }) {
+  const [cases, setCases] = useState(initCases);
+  const [tab, setTab] = useState(0);
+  const [pickupModal, setPickupModal] = useState(null);
+  const [rejectModal, setRejectModal] = useState(null);
+  const [assignTarget, setAssignTarget] = useState(null);
+  const [tripEndModal, setTripEndModal] = useState(false);
+  const [tripReport, setTripReport] = useState(null);
+
+  const alertCount = cases.filter(c=>(c.status==="已指派"&&c.wait_min>=5)).length;
+  const pendingCount = cases.filter(c=>c.status==="待指派").length;
+
+  const handleTripEnd = (report) => { setTripReport(report); setTripEndModal(false); };
+
+  const handleAccept = id => setCases(cs=>cs.map(c=>c.id===id?{...c,status:"已接單"}:c));
+  const handleReject = (id, remark) => {
+    setCases(cs => cs.map(c => c.id===id ? { ...c, status:"待指派", driver_id:null, returned:true, remark: remark ? `↩️ ${meName}退回：${remark}` : `↩️ ${meName}退回`, wait_min:0 } : c));
+    setRejectModal(null);
+  };
+  const handlePickup = ({pcs,address,remark,sigData,photoUrl}) => { setCases(cs=>cs.map(c=>c.id===pickupModal?{...c,status:"已取件",pcs_actual:pcs,address,remark,pickup_at:nowStr(),sig_url:sigData||null,photo_url:photoUrl||null}:c)); setPickupModal(null); };
+  const handleUndo = id => setCases(cs=>cs.map(c=>c.id===id?{...c,status:"待取件",pickup_at:null}:c));
+  const handleSession = (id, session) => setCases(cs=>cs.map(c=>c.id===id?{...c,session}:c));
+  const handleAssign = driverId => {
+    const ids = assignTarget.map(c=>c.id);
+    setCases(cs=>cs.map(c=>ids.includes(c.id)?{...c,status:"已指派",driver_id:driverId,assigned_at:nowStr(),wait_min:0,returned:false}:c));
+    setAssignTarget(null);
+    setTab(1);
+  };
+  const handleReorder = (driverId, from, to) => {
+    const relevant = cases.filter(c=>c.driver_id===driverId&&(c.status==="待取件"||c.status==="已接單")).sort((a,b)=>a.order-b.order);
+    if (to<0||to>=relevant.length) return;
+    const list=[...relevant]; const [item]=list.splice(from,1); list.splice(to,0,item);
+    setCases(prev=>[...prev.filter(c=>!(c.driver_id===driverId&&(c.status==="待取件"||c.status==="已接單"))),...list.map((c,i)=>({...c,order:i}))]);
+  };
+
+  const mc = cases.find(c=>c.id===pickupModal);
+  const rc = cases.find(c=>c.id===rejectModal);
+
+  const isCaptain = role === "captain";
+  const TABS = isCaptain ? [
+    { label:"我的案件", icon:"📦", badge:null },
+    { label:"全員",     icon:"👥", badge:alertCount>0?alertCount:null, badgeColor:C.red },
+    { label:"待指派",   icon:"📋", badge:pendingCount>0?pendingCount:null, badgeColor:C.orange },
+  ] : [
+    { label:"我的案件", icon:"📦", badge:null },
+  ];
+
+  return (
+    <div style={{ background:C.bg, minHeight:"100vh", fontFamily:"'Inter','Noto Sans TC',system-ui,sans-serif", maxWidth:430, margin:"0 auto", paddingBottom:isCaptain?64:0 }}>
+
+      {/* Header */}
+      <div style={{ background:`linear-gradient(135deg,${C.navy},${C.blue} 60%,${C.blueMid})`, padding:"18px 20px 16px" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+              <span style={{ fontSize:10, color:"rgba(255,255,255,0.6)", letterSpacing:2, textTransform:"uppercase" }}>GMOP Manager</span>
+              <button onClick={onLogout} style={{ background:"rgba(255,255,255,0.15)", border:"1px solid rgba(255,255,255,0.25)", borderRadius:6, padding:"1px 7px", color:"rgba(255,255,255,0.8)", fontSize:10, cursor:"pointer" }}>登出</button>
+            </div>
+            <div style={{ fontSize:22, fontWeight:900, color:C.white }}>{meName}，出發 🚛</div>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:2 }}>
+              <span style={{ fontSize:12, color:"rgba(255,255,255,0.7)" }}>{new Date().toLocaleDateString("zh-TW")}</span>
+              <span style={{ background:"rgba(255,255,255,0.18)", border:"1px solid rgba(255,255,255,0.3)", borderRadius:6, padding:"1px 8px", color:C.white, fontSize:11, fontWeight:800, letterSpacing:0.5 }}>🚐 {vehicle}</span>
+            </div>
+          </div>
+          {isCaptain && (
+            <div style={{ display:"flex", gap:8 }}>
+              {alertCount>0 && (
+                <button onClick={() => setTab(1)}
+                  style={{ background:C.red, border:"none", borderRadius:12, padding:"8px 12px", textAlign:"center", cursor:"pointer", WebkitTapHighlightColor:"transparent" }}>
+                  <div style={{ color:C.white, fontWeight:900, fontSize:20, lineHeight:1 }}>{alertCount}</div>
+                  <div style={{ color:"rgba(255,255,255,0.85)", fontSize:9 }}>待處理 ↗</div>
+                </button>
+              )}
+              {pendingCount>0 && (
+                <button onClick={() => setTab(2)}
+                  style={{ background:"rgba(255,255,255,0.15)", border:"1px solid rgba(255,255,255,0.25)", borderRadius:12, padding:"8px 12px", textAlign:"center", cursor:"pointer", WebkitTapHighlightColor:"transparent" }}>
+                  <div style={{ color:C.white, fontWeight:900, fontSize:20, lineHeight:1 }}>{pendingCount}</div>
+                  <div style={{ color:"rgba(255,255,255,0.75)", fontSize:9 }}>待指派 ↗</div>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Trip end button / summary */}
+        <div style={{ marginTop:12 }}>
+          {!tripReport ? (
+            <button onClick={() => setTripEndModal(true)}
+              style={{ width:"100%", background:"rgba(255,255,255,0.15)", border:"1px solid rgba(255,255,255,0.3)", borderRadius:10, padding:"9px 14px", color:C.white, fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+              🏁 收件結束後回報里程／加油
+            </button>
+          ) : (
+            <div style={{ background:"rgba(255,255,255,0.15)", border:"1px solid rgba(255,255,255,0.3)", borderRadius:10, padding:"9px 14px", display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ fontSize:14 }}>✅</span>
+              <div style={{ flex:1, fontSize:11, color:"rgba(255,255,255,0.9)" }}>
+                回程 {tripReport.endMileage}・{tripReport.fueled ? `加油 $${tripReport.fuelAmount}` : "未加油"}・抵達 {tripReport.arrivalTime}
+              </div>
+              <button onClick={() => setTripEndModal(true)} style={{ background:"rgba(255,255,255,0.2)", border:"none", borderRadius:6, padding:"3px 8px", color:C.white, fontSize:10, cursor:"pointer" }}>修改</button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tab content */}
+      {tab===0 && <MyCasesTab cases={cases} me={me} onAccept={handleAccept} onPickup={id=>setPickupModal(id)} onReject={id=>setRejectModal(id)} onUndo={handleUndo} onReorder={handleReorder} onSession={handleSession}/>}
+      {isCaptain && tab===1 && <TeamTab cases={cases} me={me} onReorder={handleReorder} onSession={handleSession}/>}
+      {isCaptain && tab===2 && <PendingTab cases={cases} onAssign={setAssignTarget} onSession={handleSession}/>}
+
+      {/* Bottom tab bar - only for captain (multiple tabs) */}
+      {isCaptain && (
+        <div style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, background:C.white, borderTop:`1px solid ${C.grayBorder}`, display:"flex", zIndex:100, paddingBottom:"env(safe-area-inset-bottom)" }}>
+          {TABS.map((t,i) => (
+            <button key={i} onClick={() => setTab(i)}
+              style={{ flex:1, background:"transparent", border:"none", padding:"10px 4px 8px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:3, position:"relative" }}>
+              {t.badge && (
+                <div style={{ position:"absolute", top:6, right:"calc(50% - 16px)", background:t.badgeColor, color:C.white, borderRadius:10, fontSize:10, fontWeight:800, minWidth:16, height:16, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 4px", border:"1.5px solid white" }}>{t.badge}</div>
+              )}
+              <span style={{ fontSize:20 }}>{t.icon}</span>
+              <span style={{ fontSize:11, fontWeight:tab===i?800:500, color:tab===i?C.blue:C.textMuted }}>{t.label}</span>
+              {tab===i && <div style={{ width:20, height:2.5, background:C.blue, borderRadius:2 }}/>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {pickupModal && mc && <PickupModal c={mc} onClose={()=>setPickupModal(null)} onConfirm={handlePickup}/>}
+      {rejectModal && rc && <RejectModal c={rc} onClose={()=>setRejectModal(null)} onConfirm={r=>handleReject(rejectModal,r)}/>}
+      {assignTarget && <AssignModal cases={assignTarget} onClose={()=>setAssignTarget(null)} onAssign={handleAssign}/>}
+      {tripEndModal && <TripEndModal startMileage={startMileage} vehicle={vehicle} onClose={()=>setTripEndModal(false)} onConfirm={handleTripEnd}/>}
+    </div>
+  );
+}
+
+// ── Accounts ──────────────────────────────────────────────
+const ACCOUNTS = {
+  kira: { id: "D03", name: "軒照", role: "driver" },
+  jime: { id: "D02", name: "士峰", role: "driver" },
+  nldw: { id: "D01", name: "世龍", role: "captain" },
+};
+
+// ── Login Screen ──────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState(false);
+
+  const handleSubmit = () => {
+    const account = ACCOUNTS[code.trim().toLowerCase()];
+    if (account) {
+      setError(false);
+      onLogin(account);
+    } else {
+      setError(true);
+    }
+  };
+
+  return (
+    <div style={{ background:`linear-gradient(160deg,${C.navy} 0%,${C.blue} 55%,${C.blueMid} 100%)`, minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:24, fontFamily:"'Inter','Noto Sans TC',system-ui,sans-serif" }}>
+      <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:20, width:72, height:72, display:"flex", alignItems:"center", justifyContent:"center", fontSize:34, marginBottom:20, backdropFilter:"blur(8px)" }}>📦</div>
+      <div style={{ color:C.white, fontSize:24, fontWeight:900, marginBottom:4 }}>GMOP Manager</div>
+      <div style={{ color:"rgba(255,255,255,0.75)", fontSize:13, marginBottom:36 }}>司機派件管理系統</div>
+
+      <div style={{ background:C.white, borderRadius:20, padding:24, width:"100%", maxWidth:340, boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
+        <div style={{ fontSize:13, color:C.textSub, fontWeight:700, marginBottom:8 }}>登入代碼</div>
+        <input
+          value={code}
+          onChange={e => { setCode(e.target.value); setError(false); }}
+          onKeyDown={e => e.key === "Enter" && handleSubmit()}
+          placeholder="請輸入你的登入代碼"
+          autoCapitalize="none"
+          autoCorrect="off"
+          style={{ width:"100%", background:C.grayLight, border:`1.5px solid ${error?C.red:C.grayBorder}`, borderRadius:12, padding:"14px 16px", color:C.text, fontSize:16, boxSizing:"border-box", outline:"none", marginBottom:error?8:16, fontFamily:"inherit" }}
+        />
+        {error && <div style={{ color:C.red, fontSize:12, marginBottom:16 }}>⚠️ 代碼不正確，請再試一次</div>}
+        <button onClick={handleSubmit}
+          style={{ width:"100%", background:`linear-gradient(135deg,${C.blue},${C.blueMid})`, border:"none", borderRadius:14, padding:15, color:C.white, fontSize:16, fontWeight:800, cursor:"pointer", boxShadow:C.shadowBlue }}>
+          登入
+        </button>
+      </div>
+
+      <div style={{ color:"rgba(255,255,255,0.5)", fontSize:11, marginTop:24, textAlign:"center" }}>
+        忘記代碼請聯絡隊長或公司管理員
+      </div>
+    </div>
+  );
+}
+
+// ── Root App ──────────────────────────────────────────────
+// ── Vehicle Select Screen ─────────────────────────────────
+const VEHICLES = ["RDJ-8685", "RDT-6185", "BKV-1973"];
+
+function VehicleSelectScreen({ driverName, onConfirm, onBack }) {
+  const [selected, setSelected] = useState(null);
+  const [custom, setCustom] = useState("");
+  const [useCustom, setUseCustom] = useState(false);
+  const [mileage, setMileage] = useState("");
+
+  const plate = useCustom ? custom.trim().toUpperCase() : selected;
+  const canGo = plate && mileage.trim() !== "";
+
+  return (
+    <div style={{ background:`linear-gradient(160deg,${C.navy} 0%,${C.blue} 55%,${C.blueMid} 100%)`, minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:24, fontFamily:"'Inter','Noto Sans TC',system-ui,sans-serif" }}>
+      <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:20, width:64, height:64, display:"flex", alignItems:"center", justifyContent:"center", fontSize:30, marginBottom:16, backdropFilter:"blur(8px)" }}>🚚</div>
+      <div style={{ color:C.white, fontSize:20, fontWeight:900, marginBottom:2 }}>{driverName}，今天開哪台車？</div>
+      <div style={{ color:"rgba(255,255,255,0.75)", fontSize:13, marginBottom:28 }}>請選擇車輛並填寫出發里程</div>
+
+      <div style={{ background:C.white, borderRadius:20, padding:24, width:"100%", maxWidth:340, boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
+          {VEHICLES.map(v => (
+            <button key={v} onClick={() => { setSelected(v); setUseCustom(false); }}
+              style={{ display:"flex", alignItems:"center", gap:12, background:(!useCustom && selected===v)?C.blueSoft:C.grayLight, border:`1.5px solid ${(!useCustom && selected===v)?C.blue:C.grayBorder}`, borderRadius:14, padding:"14px 16px", cursor:"pointer" }}>
+              <span style={{ fontSize:20 }}>🚐</span>
+              <span style={{ flex:1, textAlign:"left", fontSize:16, fontWeight:800, color:(!useCustom && selected===v)?C.blue:C.text, letterSpacing:1 }}>{v}</span>
+              {(!useCustom && selected===v) && <span style={{ color:C.blue, fontSize:18 }}>✓</span>}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:16 }}>
+          <div style={{ flex:1, height:1, background:C.grayBorder }} />
+          <span style={{ fontSize:11, color:C.textMuted }}>或</span>
+          <div style={{ flex:1, height:1, background:C.grayBorder }} />
+        </div>
+
+        <div style={{ fontSize:12, color:C.textSub, fontWeight:600, marginBottom:8 }}>手動輸入其他車號</div>
+        <input
+          value={custom}
+          onChange={e => { setCustom(e.target.value); setUseCustom(true); setSelected(null); }}
+          placeholder="例：ABC-1234"
+          autoCapitalize="characters"
+          style={{ width:"100%", background:C.grayLight, border:`1.5px solid ${useCustom?C.blue:C.grayBorder}`, borderRadius:12, padding:"12px 14px", color:C.text, fontSize:15, boxSizing:"border-box", outline:"none", marginBottom:20, fontFamily:"inherit", letterSpacing:1 }}
+        />
+
+        <div style={{ fontSize:12, color:C.textSub, fontWeight:600, marginBottom:8 }}>🛣️ 出發里程數</div>
+        <input
+          value={mileage}
+          onChange={e => setMileage(e.target.value.replace(/[^0-9]/g, ""))}
+          placeholder="例：45280"
+          inputMode="numeric"
+          style={{ width:"100%", background:C.grayLight, border:`1.5px solid ${C.grayBorder}`, borderRadius:12, padding:"12px 14px", color:C.text, fontSize:16, boxSizing:"border-box", outline:"none", marginBottom:20, fontFamily:"inherit", fontWeight:700 }}
+        />
+
+        <button onClick={() => canGo && onConfirm(plate, mileage)} disabled={!canGo}
+          style={{ width:"100%", background:canGo?`linear-gradient(135deg,${C.blue},${C.blueMid})`:C.grayLight, border:"none", borderRadius:14, padding:15, color:canGo?C.white:C.textMuted, fontSize:16, fontWeight:800, cursor:canGo?"pointer":"default", marginBottom:10, boxShadow:canGo?C.shadowBlue:"none" }}>
+          確認出發
+        </button>
+        <button onClick={onBack}
+          style={{ width:"100%", background:"transparent", border:"none", padding:8, color:C.textMuted, fontSize:13, cursor:"pointer" }}>
+          ← 返回登入
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [account, setAccount] = useState(null);
+  const [vehicle, setVehicle] = useState(null);
+  const [startMileage, setStartMileage] = useState(null);
+
+  if (!account) {
+    return <LoginScreen onLogin={setAccount} />;
+  }
+
+  if (!vehicle) {
+    return (
+      <VehicleSelectScreen
+        driverName={account.name}
+        onConfirm={(plate, mileage) => { setVehicle(plate); setStartMileage(mileage); }}
+        onBack={() => setAccount(null)}
+      />
+    );
+  }
+
+  return (
+    <MainApp
+      me={account.id}
+      meName={account.name}
+      role={account.role}
+      vehicle={vehicle}
+      startMileage={startMileage}
+      onLogout={() => { setAccount(null); setVehicle(null); setStartMileage(null); }}
+    />
+  );
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
