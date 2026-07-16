@@ -326,8 +326,116 @@ function(a,b,c){if(!Vd(b))throw Error(m(200));return Wd(null,a,b,!1,c)};Q.unmoun
 
 </script>
 
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+
 <script>
-const { useState, useRef, useEffect } = React;
+const { useState, useRef, useEffect, useCallback } = React;
+
+// ── Firebase：讓司機／隊長／客人的手機即時同步同一份資料 ──
+const firebaseConfig = {
+  apiKey: "AIzaSyA1eVugDZKhoaaBjqSzrbjUEXevWIMurO0",
+  authDomain: "gmop-manager.firebaseapp.com",
+  databaseURL: "https://gmop-manager-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "gmop-manager",
+  storageBucket: "gmop-manager.firebasestorage.app",
+  messagingSenderId: "724213116516",
+  appId: "1:724213116516:web:04bc7e8158fe2b54687971"
+};
+firebase.initializeApp(firebaseConfig);
+const fbDb = firebase.database();
+
+// 用起來像 useState 的陣列（例如 cases），但背後會即時讀寫 Firebase，
+// 而且只會把「真正變動的那幾筆」同步上去，不會整批覆蓋，降低多人同時操作互相蓋掉的機率。
+function useFirebaseList(path, initialList, keyField = "id") {
+  const [list, setListState] = useState(initialList);
+  const listRef = useRef(initialList);
+  const seededRef = useRef(false);
+  useEffect(() => {
+    const dbRef = fbDb.ref(path);
+    const onValue = snap => {
+      const val = snap.val();
+      if (val === null) {
+        if (!seededRef.current) {
+          seededRef.current = true;
+          const seed = {};
+          initialList.forEach(item => {
+            seed[item[keyField]] = item;
+          });
+          dbRef.set(seed);
+        }
+        return;
+      }
+      seededRef.current = true;
+      const next = Object.values(val);
+      listRef.current = next;
+      setListState(next);
+    };
+    dbRef.on("value", onValue);
+    return () => dbRef.off("value", onValue);
+  }, [path]);
+  const setList = useCallback(updater => {
+    const prev = listRef.current;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    listRef.current = next;
+    const prevMap = {};
+    prev.forEach(item => {
+      prevMap[item[keyField]] = item;
+    });
+    const nextMap = {};
+    next.forEach(item => {
+      nextMap[item[keyField]] = item;
+    });
+    const updates = {};
+    Object.keys(nextMap).forEach(k => {
+      if (JSON.stringify(prevMap[k]) !== JSON.stringify(nextMap[k])) updates[k] = nextMap[k];
+    });
+    Object.keys(prevMap).forEach(k => {
+      if (!(k in nextMap)) updates[k] = null;
+    });
+    if (Object.keys(updates).length) fbDb.ref(path).update(updates);
+  }, [path]);
+  return [list, setList];
+}
+
+// 用起來像 useState 的物件（例如 accounts：登入代碼 → 帳號資料），背後即時讀寫 Firebase。
+function useFirebaseObject(path, initialObj) {
+  const [obj, setObjState] = useState(initialObj);
+  const objRef = useRef(initialObj);
+  const seededRef = useRef(false);
+  useEffect(() => {
+    const dbRef = fbDb.ref(path);
+    const onValue = snap => {
+      const val = snap.val();
+      if (val === null) {
+        if (!seededRef.current) {
+          seededRef.current = true;
+          dbRef.set(initialObj);
+        }
+        return;
+      }
+      seededRef.current = true;
+      objRef.current = val;
+      setObjState(val);
+    };
+    dbRef.on("value", onValue);
+    return () => dbRef.off("value", onValue);
+  }, [path]);
+  const setObj = useCallback(updater => {
+    const prev = objRef.current;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    objRef.current = next;
+    const updates = {};
+    Object.keys(next).forEach(k => {
+      if (JSON.stringify(prev[k]) !== JSON.stringify(next[k])) updates[k] = next[k];
+    });
+    Object.keys(prev).forEach(k => {
+      if (!(k in next)) updates[k] = null;
+    });
+    if (Object.keys(updates).length) fbDb.ref(path).update(updates);
+  }, [path]);
+  return [obj, setObj];
+}
 
 const C = {
   navy: "#1A4A8A",
@@ -377,6 +485,11 @@ const nowStr = () => new Date().toLocaleTimeString("zh-TW", {
   hour: "2-digit",
   minute: "2-digit"
 });
+const todayStr = () => {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 const net = c => c.pcs - (c.cancel_pcs || 0);
 // Google Maps 有時不會把百分比編碼的中文還原，導致顯示亂碼。
 // 這裡只針對網址保留字元做最小必要編碼，中文字直接保留原樣。
@@ -450,6 +563,51 @@ const STATUS_CFG = {
     soft: C.redSoft,
     icon: "⚠️",
     label: "退回"
+  }
+};
+// 客人視角看到的狀態名稱（跟司機／隊長看到的內部狀態對應）
+const CUSTOMER_STATUS_CFG = {
+  待指派: {
+    color: C.orange,
+    light: C.orangeLight,
+    soft: C.orangeLight,
+    icon: "🕓",
+    label: "待派件"
+  },
+  已指派: {
+    color: C.blue,
+    light: C.blueLight,
+    soft: C.blueSoft,
+    icon: "📋",
+    label: "已派件"
+  },
+  已接單: {
+    color: C.navy,
+    light: C.blueLight,
+    soft: C.blueSoft,
+    icon: "🚚",
+    label: "已出車"
+  },
+  待取件: {
+    color: C.navy,
+    light: C.blueLight,
+    soft: C.blueSoft,
+    icon: "🚚",
+    label: "已出車"
+  },
+  已取件: {
+    color: C.green,
+    light: C.greenLight,
+    soft: C.greenSoft,
+    icon: "✅",
+    label: "已取件"
+  },
+  退回: {
+    color: C.red,
+    light: C.redLight,
+    soft: C.redSoft,
+    icon: "⚠️",
+    label: "已退回"
   }
 };
 const initCases = [
@@ -3595,24 +3753,35 @@ function MainApp({
 }
 
 // ── Accounts ──────────────────────────────────────────────
-const ACCOUNTS = {
+const DEFAULT_ACCOUNTS = {
   kira: {
+    code: "kira",
     id: "D03",
     name: "軒照",
     role: "driver"
   },
   jime: {
+    code: "jime",
     id: "D02",
     name: "士峰",
     role: "driver"
   },
   nldw: {
+    code: "nldw",
     id: "D01",
     name: "世龍",
     role: "captain"
   },
+  kiki: {
+    code: "kiki",
+    id: "ADMIN01",
+    name: "Kiki",
+    role: "admin"
+  },
   presco: {
+    code: "presco",
     id: "CUST01",
+    memberCode: "A001",
     name: "PRESCO",
     role: "customer"
   }
@@ -3620,12 +3789,13 @@ const ACCOUNTS = {
 
 // ── Login Screen ──────────────────────────────────────────
 function LoginScreen({
+  accounts,
   onLogin
 }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState(false);
   const handleSubmit = () => {
-    const account = ACCOUNTS[code.trim().toLowerCase()];
+    const account = accounts[code.trim().toLowerCase()];
     if (account) {
       setError(false);
       onLogin(account);
@@ -3953,18 +4123,25 @@ function VehicleSelectScreen({
 // ── Add Case Screen (客戶新增取件需求) ──────────────────────
 function AddCaseScreen({
   customerName,
+  memberCode,
+  myCases,
   onSubmit,
   onLogout
 }) {
-  const [form, setForm] = useState({
-    member: "",
+  const [tab, setTab] = useState(0);
+  const blankForm = () => ({
+    member: customerName || "",
+    pickupDate: todayStr(),
+    pickupTime: "",
     address: "",
     phone: "",
     contact: "",
+    pcs: "1",
     remark: ""
   });
+  const [form, setForm] = useState(blankForm);
   const [submitted, setSubmitted] = useState(false);
-  const canSubmit = form.member.trim() && form.address.trim() && form.phone.trim() && form.contact.trim();
+  const canSubmit = form.member.trim() && form.pickupDate.trim() && form.pickupTime.trim() && form.address.trim() && form.phone.trim() && form.contact.trim() && Number(form.pcs) > 0;
   const handleSubmit = () => {
     if (!canSubmit) return;
     onSubmit({
@@ -3973,13 +4150,7 @@ function AddCaseScreen({
     setSubmitted(true);
   };
   const handleAddAnother = () => {
-    setForm({
-      member: "",
-      address: "",
-      phone: "",
-      contact: "",
-      remark: ""
-    });
+    setForm(blankForm());
     setSubmitted(false);
   };
   const inp = {
@@ -4057,29 +4228,54 @@ function AddCaseScreen({
         marginBottom: 10
       }
     }, "➕ 再新增一筆"), /*#__PURE__*/React.createElement("button", {
-      onClick: onLogout,
+      onClick: () => {
+        setSubmitted(false);
+        setTab(1);
+      },
       style: {
         width: "100%",
         background: "transparent",
         border: `1.5px solid ${C.grayBorder}`,
         borderRadius: 14,
         padding: 13,
-        color: C.textSub,
+        color: C.blue,
         fontSize: 14,
+        fontWeight: 700,
+        cursor: "pointer",
+        marginBottom: 10
+      }
+    }, "📋 查看我的案件狀態"), /*#__PURE__*/React.createElement("button", {
+      onClick: onLogout,
+      style: {
+        width: "100%",
+        background: "transparent",
+        border: "none",
+        padding: 8,
+        color: C.textMuted,
+        fontSize: 13,
         cursor: "pointer"
       }
     }, "登出")));
   }
-  return /*#__PURE__*/React.createElement("div", {
+  const tabBtn = (i, icon, txt) => /*#__PURE__*/React.createElement("button", {
+    key: i,
+    onClick: () => setTab(i),
     style: {
-      background: C.bg,
-      minHeight: "100vh",
-      fontFamily: "'Inter','Noto Sans TC',system-ui,sans-serif"
+      flex: 1,
+      background: tab === i ? "rgba(255,255,255,0.2)" : "transparent",
+      border: tab === i ? "1px solid rgba(255,255,255,0.35)" : "1px solid transparent",
+      borderRadius: 10,
+      padding: "9px 4px",
+      color: C.white,
+      fontSize: 13,
+      fontWeight: tab === i ? 800 : 600,
+      cursor: "pointer"
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, icon, " ", txt);
+  const header = /*#__PURE__*/React.createElement("div", {
     style: {
       background: `linear-gradient(135deg,${C.navy},${C.blue} 60%,${C.blueMid})`,
-      padding: "20px 20px 24px"
+      padding: "20px 20px 16px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4101,7 +4297,7 @@ function AddCaseScreen({
       fontWeight: 900,
       color: C.white
     }
-  }, customerName, " 新增取件需求")), /*#__PURE__*/React.createElement("button", {
+  }, customerName, memberCode ? ` (${memberCode})` : "")), /*#__PURE__*/React.createElement("button", {
     onClick: onLogout,
     style: {
       background: "rgba(255,255,255,0.15)",
@@ -4112,7 +4308,88 @@ function AddCaseScreen({
       fontSize: 12,
       cursor: "pointer"
     }
-  }, "登出"))), /*#__PURE__*/React.createElement("div", {
+  }, "登出")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 16
+    }
+  }, tabBtn(0, "➕", "新增取件"), tabBtn(1, "📋", "我的案件")));
+  if (tab === 1) {
+    const sorted = [...(myCases || [])].sort((a, b) => b.id.localeCompare(a.id));
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.bg,
+        minHeight: "100vh",
+        fontFamily: "'Inter','Noto Sans TC',system-ui,sans-serif"
+      }
+    }, header, /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: 20,
+        maxWidth: 430,
+        margin: "0 auto"
+      }
+    }, sorted.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "60px 20px",
+        color: C.textMuted
+      }
+    }, "尚未新增任何取件案件") : sorted.map(c => {
+      const cfg = CUSTOMER_STATUS_CFG[c.status] || {
+        color: C.textMuted,
+        soft: C.grayLight,
+        icon: "•",
+        label: c.status
+      };
+      return /*#__PURE__*/React.createElement("div", {
+        key: c.id,
+        style: {
+          background: C.white,
+          borderRadius: 16,
+          padding: 16,
+          marginBottom: 12,
+          boxShadow: C.shadow
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 8
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontWeight: 800,
+          fontSize: 15,
+          color: C.text
+        }
+      }, c.customer), /*#__PURE__*/React.createElement("div", {
+        style: {
+          background: cfg.soft,
+          color: cfg.color,
+          fontSize: 12,
+          fontWeight: 800,
+          padding: "4px 10px",
+          borderRadius: 10,
+          whiteSpace: "nowrap"
+        }
+      }, cfg.icon, " ", cfg.label)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 13,
+          color: C.textSub,
+          lineHeight: 1.7
+        }
+      }, "📅 ", c.pickup_date || "-", " ", c.pickup_time || "", /*#__PURE__*/React.createElement("br", null), "📍 ", c.address, /*#__PURE__*/React.createElement("br", null), "👤 ", c.name, "・", c.phone, /*#__PURE__*/React.createElement("br", null), "📦 ", c.pcs, " 件", c.remark ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("br", null), "📝 ", c.remark) : null));
+    })));
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.bg,
+      minHeight: "100vh",
+      fontFamily: "'Inter','Noto Sans TC',system-ui,sans-serif"
+    }
+  }, header, /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 20,
       maxWidth: 430,
@@ -4142,7 +4419,40 @@ function AddCaseScreen({
       marginTop: -8,
       marginBottom: 14
     }
-  }, "送出後司機端會顯示為「數網-", form.member || "會員名稱", "」"), /*#__PURE__*/React.createElement("div", {
+  }, "送出後司機端會顯示為「", memberCode || "會員編號", "-", form.member || "會員名稱", "」"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: label
+  }, "取件日期 *"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: form.pickupDate,
+    onChange: e => setForm(f => ({
+      ...f,
+      pickupDate: e.target.value
+    })),
+    style: inp
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: label
+  }, "取件時間 *"), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    value: form.pickupTime,
+    onChange: e => setForm(f => ({
+      ...f,
+      pickupTime: e.target.value
+    })),
+    style: inp
+  }))), /*#__PURE__*/React.createElement("div", {
     style: label
   }, "取件地址 *"), /*#__PURE__*/React.createElement("input", {
     value: form.address,
@@ -4171,6 +4481,18 @@ function AddCaseScreen({
       contact: e.target.value
     })),
     placeholder: "例：陳小姐",
+    style: inp
+  }), /*#__PURE__*/React.createElement("div", {
+    style: label
+  }, "取件數 *"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "1",
+    value: form.pcs,
+    onChange: e => setForm(f => ({
+      ...f,
+      pcs: e.target.value
+    })),
+    placeholder: "例：1",
     style: inp
   }), /*#__PURE__*/React.createElement("div", {
     style: label
@@ -4203,21 +4525,269 @@ function AddCaseScreen({
     }
   }, "送出取件需求"))));
 }
+
+// ── Admin Screen（管理者：新增／管理客人帳號）────────────
+function AdminScreen({
+  accounts,
+  setAccounts,
+  onLogout
+}) {
+  const blankForm = () => ({
+    code: "",
+    memberCode: "",
+    name: ""
+  });
+  const [form, setForm] = useState(blankForm);
+  const [error, setError] = useState("");
+  const customerAccounts = Object.values(accounts).filter(a => a.role === "customer").sort((a, b) => (a.memberCode || "").localeCompare(b.memberCode || ""));
+  const canSubmit = form.code.trim() && form.memberCode.trim() && form.name.trim();
+  const inp = {
+    width: "100%",
+    background: C.grayLight,
+    border: `1.5px solid ${C.grayBorder}`,
+    borderRadius: 12,
+    padding: "13px 14px",
+    color: C.text,
+    fontSize: 15,
+    boxSizing: "border-box",
+    outline: "none",
+    marginBottom: 14,
+    fontFamily: "inherit"
+  };
+  const label = {
+    fontSize: 12,
+    color: C.textSub,
+    fontWeight: 600,
+    marginBottom: 6
+  };
+  const handleAdd = () => {
+    if (!canSubmit) return;
+    const code = form.code.trim().toLowerCase();
+    if (accounts[code]) {
+      setError("這個登入代碼已經有人在用了，換一個試試");
+      return;
+    }
+    setAccounts(accs => ({
+      ...accs,
+      [code]: {
+        code,
+        id: form.memberCode.trim(),
+        memberCode: form.memberCode.trim(),
+        name: form.name.trim(),
+        role: "customer"
+      }
+    }));
+    setForm(blankForm());
+    setError("");
+  };
+  const handleDelete = code => {
+    if (!window.confirm(`確定要刪除帳號「${code}」嗎？`)) return;
+    setAccounts(accs => {
+      const next = {
+        ...accs
+      };
+      delete next[code];
+      return next;
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.bg,
+      minHeight: "100vh",
+      fontFamily: "'Inter','Noto Sans TC',system-ui,sans-serif"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: `linear-gradient(135deg,${C.navy},${C.blue} 60%,${C.blueMid})`,
+      padding: "20px 20px 24px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "rgba(255,255,255,0.6)",
+      letterSpacing: 2,
+      textTransform: "uppercase",
+      marginBottom: 4
+    }
+  }, "GMOP Manager"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 20,
+      fontWeight: 900,
+      color: C.white
+    }
+  }, "客人帳號管理")), /*#__PURE__*/React.createElement("button", {
+    onClick: onLogout,
+    style: {
+      background: "rgba(255,255,255,0.15)",
+      border: "1px solid rgba(255,255,255,0.25)",
+      borderRadius: 8,
+      padding: "6px 12px",
+      color: "rgba(255,255,255,0.9)",
+      fontSize: 12,
+      cursor: "pointer"
+    }
+  }, "登出"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 20,
+      maxWidth: 430,
+      margin: "0 auto"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.white,
+      borderRadius: 18,
+      padding: 20,
+      boxShadow: C.shadow,
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 15,
+      color: C.text,
+      marginBottom: 14
+    }
+  }, "➕ 新增客人帳號"), /*#__PURE__*/React.createElement("div", {
+    style: label
+  }, "登入代碼 *"), /*#__PURE__*/React.createElement("input", {
+    value: form.code,
+    onChange: e => {
+      setForm(f => ({
+        ...f,
+        code: e.target.value
+      }));
+      setError("");
+    },
+    placeholder: "例：fengyang（客人登入用，英文/數字）",
+    autoCapitalize: "none",
+    autoCorrect: "off",
+    style: inp
+  }), /*#__PURE__*/React.createElement("div", {
+    style: label
+  }, "會員編號 *"), /*#__PURE__*/React.createElement("input", {
+    value: form.memberCode,
+    onChange: e => setForm(f => ({
+      ...f,
+      memberCode: e.target.value
+    })),
+    placeholder: "例：A001",
+    style: inp
+  }), /*#__PURE__*/React.createElement("div", {
+    style: label
+  }, "客戶名稱 *"), /*#__PURE__*/React.createElement("input", {
+    value: form.name,
+    onChange: e => setForm(f => ({
+      ...f,
+      name: e.target.value
+    })),
+    placeholder: "例：豐漾",
+    style: inp
+  }), error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.red,
+      fontSize: 12,
+      marginBottom: 12
+    }
+  }, "⚠️ ", error), /*#__PURE__*/React.createElement("button", {
+    onClick: handleAdd,
+    disabled: !canSubmit,
+    style: {
+      width: "100%",
+      background: canSubmit ? `linear-gradient(135deg,${C.blue},${C.blueMid})` : C.grayLight,
+      border: "none",
+      borderRadius: 14,
+      padding: 14,
+      color: canSubmit ? C.white : C.textMuted,
+      fontSize: 15,
+      fontWeight: 800,
+      cursor: canSubmit ? "pointer" : "default"
+    }
+  }, "新增帳號")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 14,
+      color: C.textSub,
+      marginBottom: 10
+    }
+  }, "目前的客人帳號（", customerAccounts.length, "）"), customerAccounts.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "40px 20px",
+      color: C.textMuted
+    }
+  }, "還沒有任何客人帳號") : customerAccounts.map(a => /*#__PURE__*/React.createElement("div", {
+    key: a.code,
+    style: {
+      background: C.white,
+      borderRadius: 14,
+      padding: "12px 16px",
+      marginBottom: 10,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      boxShadow: C.shadow
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 14,
+      color: C.text
+    }
+  }, a.memberCode, " ・ ", a.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.textMuted,
+      marginTop: 2
+    }
+  }, "登入代碼：", a.code)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => handleDelete(a.code),
+    style: {
+      background: "transparent",
+      border: `1.5px solid ${C.redLight}`,
+      borderRadius: 8,
+      padding: "6px 10px",
+      color: C.red,
+      fontSize: 12,
+      cursor: "pointer"
+    }
+  }, "刪除")))));
+}
+
 function App() {
   const [account, setAccount] = useState(null);
   const [vehicle, setVehicle] = useState(null);
   const [startMileage, setStartMileage] = useState(null);
-  const [cases, setCases] = useState(initCases);
+  const [cases, setCases] = useFirebaseList("cases", initCases);
+  const [accounts, setAccounts] = useFirebaseObject("accounts", DEFAULT_ACCOUNTS);
   if (!account) {
     return /*#__PURE__*/React.createElement(LoginScreen, {
+      accounts: accounts,
       onLogin: setAccount
+    });
+  }
+
+  // 管理者帳號：新增／管理客人帳號
+  if (account.role === "admin") {
+    return /*#__PURE__*/React.createElement(AdminScreen, {
+      accounts: accounts,
+      setAccounts: setAccounts,
+      onLogout: () => setAccount(null)
     });
   }
 
   // 客戶帳號：直接進新增取件需求畫面，不用選車、不用看派件
   if (account.role === "customer") {
+    const myCases = cases.filter(c => c.customer_login === account.code);
     return /*#__PURE__*/React.createElement(AddCaseScreen, {
       customerName: account.name,
+      memberCode: account.memberCode,
+      myCases: myCases,
       onLogout: () => setAccount(null),
       onSubmit: form => {
         const newId = "GMP-" + Date.now().toString().slice(-6);
@@ -4225,12 +4795,14 @@ function App() {
           id: newId,
           status: "待指派",
           driver_id: null,
-          customer: `數網-${form.member}`,
+          customer: `${account.memberCode}-${form.member}`,
+          customer_login: account.code,
           name: form.contact,
           address: form.address,
           phone: form.phone,
-          pickup_time: "",
-          pcs: 1,
+          pickup_date: form.pickupDate,
+          pickup_time: form.pickupTime,
+          pcs: Number(form.pcs) || 1,
           cancel_pcs: 0,
           pcs_actual: null,
           remark: form.remark,
