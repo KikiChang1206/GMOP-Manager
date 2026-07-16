@@ -327,6 +327,7 @@ function(a,b,c){if(!Vd(b))throw Error(m(200));return Wd(null,a,b,!1,c)};Q.unmoun
 </script>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 
 <script>
@@ -344,6 +345,16 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const fbDb = firebase.database();
+// 用「匿名登入」擋掉外部隨便亂讀寫資料庫的人（App 本身會自動、無感登入，使用者不會看到任何登入畫面）。
+// 資料庫的安全性規則會要求 auth != null，所以所有讀寫都要等匿名登入完成後才能進行。
+let resolveAuthReady;
+const authReady = new Promise(resolve => {
+  resolveAuthReady = resolve;
+});
+firebase.auth().onAuthStateChanged(user => {
+  if (user) resolveAuthReady();
+});
+firebase.auth().signInAnonymously().catch(err => console.error("Firebase 匿名登入失敗：", err));
 
 // 用起來像 useState 的陣列（例如 cases），但背後會即時讀寫 Firebase，
 // 而且只會把「真正變動的那幾筆」同步上去，不會整批覆蓋，降低多人同時操作互相蓋掉的機率。
@@ -352,27 +363,36 @@ function useFirebaseList(path, initialList, keyField = "id") {
   const listRef = useRef(initialList);
   const seededRef = useRef(false);
   useEffect(() => {
-    const dbRef = fbDb.ref(path);
-    const onValue = snap => {
-      const val = snap.val();
-      if (val === null) {
-        if (!seededRef.current) {
-          seededRef.current = true;
-          const seed = {};
-          initialList.forEach(item => {
-            seed[item[keyField]] = item;
-          });
-          dbRef.set(seed);
+    let cancelled = false;
+    let dbRef = null;
+    let onValue = null;
+    authReady.then(() => {
+      if (cancelled) return;
+      dbRef = fbDb.ref(path);
+      onValue = snap => {
+        const val = snap.val();
+        if (val === null) {
+          if (!seededRef.current) {
+            seededRef.current = true;
+            const seed = {};
+            initialList.forEach(item => {
+              seed[item[keyField]] = item;
+            });
+            dbRef.set(seed);
+          }
+          return;
         }
-        return;
-      }
-      seededRef.current = true;
-      const next = Object.values(val);
-      listRef.current = next;
-      setListState(next);
+        seededRef.current = true;
+        const next = Object.values(val);
+        listRef.current = next;
+        setListState(next);
+      };
+      dbRef.on("value", onValue);
+    });
+    return () => {
+      cancelled = true;
+      if (dbRef && onValue) dbRef.off("value", onValue);
     };
-    dbRef.on("value", onValue);
-    return () => dbRef.off("value", onValue);
   }, [path]);
   const setList = useCallback(updater => {
     const prev = listRef.current;
@@ -393,7 +413,7 @@ function useFirebaseList(path, initialList, keyField = "id") {
     Object.keys(prevMap).forEach(k => {
       if (!(k in nextMap)) updates[k] = null;
     });
-    if (Object.keys(updates).length) fbDb.ref(path).update(updates);
+    if (Object.keys(updates).length) authReady.then(() => fbDb.ref(path).update(updates));
   }, [path]);
   return [list, setList];
 }
@@ -404,22 +424,31 @@ function useFirebaseObject(path, initialObj) {
   const objRef = useRef(initialObj);
   const seededRef = useRef(false);
   useEffect(() => {
-    const dbRef = fbDb.ref(path);
-    const onValue = snap => {
-      const val = snap.val();
-      if (val === null) {
-        if (!seededRef.current) {
-          seededRef.current = true;
-          dbRef.set(initialObj);
+    let cancelled = false;
+    let dbRef = null;
+    let onValue = null;
+    authReady.then(() => {
+      if (cancelled) return;
+      dbRef = fbDb.ref(path);
+      onValue = snap => {
+        const val = snap.val();
+        if (val === null) {
+          if (!seededRef.current) {
+            seededRef.current = true;
+            dbRef.set(initialObj);
+          }
+          return;
         }
-        return;
-      }
-      seededRef.current = true;
-      objRef.current = val;
-      setObjState(val);
+        seededRef.current = true;
+        objRef.current = val;
+        setObjState(val);
+      };
+      dbRef.on("value", onValue);
+    });
+    return () => {
+      cancelled = true;
+      if (dbRef && onValue) dbRef.off("value", onValue);
     };
-    dbRef.on("value", onValue);
-    return () => dbRef.off("value", onValue);
   }, [path]);
   const setObj = useCallback(updater => {
     const prev = objRef.current;
@@ -432,7 +461,7 @@ function useFirebaseObject(path, initialObj) {
     Object.keys(prev).forEach(k => {
       if (!(k in next)) updates[k] = null;
     });
-    if (Object.keys(updates).length) fbDb.ref(path).update(updates);
+    if (Object.keys(updates).length) authReady.then(() => fbDb.ref(path).update(updates));
   }, [path]);
   return [obj, setObj];
 }
