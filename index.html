@@ -1843,6 +1843,7 @@ function CaseCard({
   onReject,
   onUndo,
   readOnly = false,
+  canRevoke = false,
   onSession
 }) {
   const cfg = STATUS_CFG[c.status] || {};
@@ -2038,7 +2039,7 @@ function CaseCard({
       gap: 5,
       marginLeft: 10
     }
-  }, !readOnly && (c.status === "已指派" || c.status === "待取件" || c.status === "已接單" || c.status === "已取件") && /*#__PURE__*/React.createElement(OverflowBtn, {
+  }, (!readOnly || canRevoke) && (c.status === "已指派" || c.status === "待取件" || c.status === "已接單" || c.status === "已取件") && /*#__PURE__*/React.createElement(OverflowBtn, {
     items: c.status === "已指派" ? [{
       icon: "⚠️",
       label: "無法接單",
@@ -2497,7 +2498,9 @@ function TeamTab({
   cases,
   me,
   onReorder,
-  onSession
+  onSession,
+  onUndo,
+  onReject
 }) {
   const [driverIdx, setDriverIdx] = useState(0);
   const [sortMode, setSortMode] = useState(false);
@@ -2719,6 +2722,9 @@ function TeamTab({
     showRoute: false,
     sortMode: false,
     readOnly: true,
+    canRevoke: true,
+    onUndo: () => onUndo(c.id),
+    onReject: () => onReject(c.id),
     onSession: onSession
   })) : (() => {
     const groups = [{
@@ -2768,6 +2774,9 @@ function TeamTab({
         routeNum: i + 1,
         sortMode: sortMode,
         readOnly: true,
+        canRevoke: true,
+        onUndo: () => onUndo(c.id),
+        onReject: () => onReject(c.id),
         onMoveUp: () => onReorder(driver.id, i, i - 1, section),
         onMoveDown: () => onReorder(driver.id, i, i + 1, section),
         onSession: onSession
@@ -3693,7 +3702,9 @@ function MainApp({
     cases: cases,
     me: me,
     onReorder: handleReorder,
-    onSession: handleSession
+    onSession: handleSession,
+    onUndo: handleUndo,
+    onReject: id => setRejectModal(id)
   }), isCaptain && tab === 2 && /*#__PURE__*/React.createElement(PendingTab, {
     cases: cases,
     onAssign: setAssignTarget,
