@@ -3837,18 +3837,21 @@ function MainApp({
       fontSize: 12,
       color: "rgba(255,255,255,0.7)"
     }
-  }, new Date().toLocaleDateString("zh-TW")), vehicle && /*#__PURE__*/React.createElement("span", {
+  }, new Date().toLocaleDateString("zh-TW")), vehicle && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setDepartModal(true),
     style: {
       background: "rgba(255,255,255,0.18)",
       border: "1px solid rgba(255,255,255,0.3)",
       borderRadius: 6,
-      padding: "1px 8px",
+      padding: "2px 8px",
       color: C.white,
       fontSize: 11,
       fontWeight: 800,
-      letterSpacing: 0.5
+      letterSpacing: 0.5,
+      cursor: "pointer",
+      fontFamily: "inherit"
     }
-  }, "🚐 ", vehicle))), isCaptain && /*#__PURE__*/React.createElement("div", {
+  }, "🚐 ", vehicle, " ✏️"))), isCaptain && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8
@@ -4077,6 +4080,8 @@ function MainApp({
     onConfirm: handleTripEnd
   }), departModal && /*#__PURE__*/React.createElement(DepartModal, {
     driverName: meName,
+    initialPlate: vehicle,
+    initialMileage: startMileage,
     onClose: () => setDepartModal(false),
     onConfirm: (plate, mileage) => {
       setVehicle(plate);
@@ -4251,15 +4256,19 @@ function LoginScreen({
 const VEHICLES = ["RDJ-8685", "RDT-6185", "BKV-1973"];
 function DepartModal({
   driverName,
+  initialPlate,
+  initialMileage,
   onConfirm,
   onClose
 }) {
-  const [selected, setSelected] = useState(null);
-  const [custom, setCustom] = useState("");
-  const [useCustom, setUseCustom] = useState(false);
-  const [mileage, setMileage] = useState("");
+  const initialIsPreset = initialPlate && VEHICLES.includes(initialPlate);
+  const [selected, setSelected] = useState(initialIsPreset ? initialPlate : null);
+  const [custom, setCustom] = useState(initialPlate && !initialIsPreset ? initialPlate : "");
+  const [useCustom, setUseCustom] = useState(!!(initialPlate && !initialIsPreset));
+  const [mileage, setMileage] = useState(initialMileage ? String(initialMileage) : "");
   const plate = useCustom ? custom.trim().toUpperCase() : selected;
   const canGo = plate && mileage.trim() !== "";
+  const isEdit = !!initialPlate;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -4298,7 +4307,7 @@ function DepartModal({
       color: C.text,
       marginBottom: 2
     }
-  }, "🚛 出發登記"), /*#__PURE__*/React.createElement("div", {
+  }, isEdit ? "✏️ 修改車牌／里程" : "🚛 出發登記"), /*#__PURE__*/React.createElement("div", {
     style: {
       color: C.textSub,
       fontSize: 13,
@@ -4441,7 +4450,7 @@ function DepartModal({
       marginBottom: 10,
       boxShadow: canGo ? C.shadowBlue : "none"
     }
-  }, "確認出發"), /*#__PURE__*/React.createElement("button", {
+  }, isEdit ? "儲存修改" : "確認出發"), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     style: {
       width: "100%",
