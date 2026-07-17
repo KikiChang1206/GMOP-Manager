@@ -3939,7 +3939,10 @@ function MainApp({
       background: "rgba(255,255,255,0.15)",
       border: "1px solid rgba(255,255,255,0.3)",
       borderRadius: 10,
-      padding: "9px 14px",
+      padding: "9px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
       display: "flex",
       alignItems: "center",
       gap: 10
@@ -3965,7 +3968,27 @@ function MainApp({
       fontSize: 10,
       cursor: "pointer"
     }
-  }, "修改")))), tab === 0 && /*#__PURE__*/React.createElement(MyCasesTab, {
+  }, "修改")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      if (!window.confirm("要開始新的一趟嗎？將重新登記出發車牌與里程。")) return;
+      setTrips(t => ({
+        ...t,
+        [me]: {}
+      }));
+    },
+    style: {
+      width: "100%",
+      marginTop: 8,
+      background: "rgba(255,255,255,0.25)",
+      border: "1px solid rgba(255,255,255,0.4)",
+      borderRadius: 8,
+      padding: "8px",
+      color: C.white,
+      fontSize: 12,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, "🔄 再次出發（重新登記里程）")))), tab === 0 && /*#__PURE__*/React.createElement(MyCasesTab, {
     cases: cases,
     me: me,
     onAccept: handleAccept,
@@ -4490,6 +4513,7 @@ function DepartModal({
 function AddCaseScreen({
   customerName,
   memberCode,
+  defaults = {},
   myCases,
   onSubmit,
   onLogout
@@ -4499,9 +4523,9 @@ function AddCaseScreen({
     member: customerName || "",
     pickupDate: todayStr(),
     pickupTime: "",
-    address: "",
-    phone: "",
-    contact: "",
+    address: defaults.address || "",
+    phone: defaults.phone || "",
+    contact: defaults.contact || "",
     pcs: "1",
     remark: ""
   });
@@ -4925,9 +4949,11 @@ function AccountsAdmin({
     role: "driver"
   });
   const [cForm, setCForm] = useState({
-    code: "",
     memberCode: "",
-    name: ""
+    name: "",
+    address: "",
+    phone: "",
+    contact: ""
   });
   const [dErr, setDErr] = useState("");
   const [cErr, setCErr] = useState("");
@@ -4937,7 +4963,7 @@ function AccountsAdmin({
   const adminCount = staff.filter(a => a.role === "admin").length;
   const customers = Object.values(accounts).filter(a => a.role === "customer").sort((a, b) => (a.memberCode || "").localeCompare(b.memberCode || ""));
   const dCanSubmit = dForm.code.trim() && dForm.name.trim();
-  const cCanSubmit = cForm.code.trim() && cForm.memberCode.trim() && cForm.name.trim();
+  const cCanSubmit = cForm.memberCode.trim() && cForm.name.trim();
   const addDriver = () => {
     if (!dCanSubmit) return;
     const code = dForm.code.trim().toLowerCase();
@@ -4965,25 +4991,31 @@ function AccountsAdmin({
   };
   const addCustomer = () => {
     if (!cCanSubmit) return;
-    const code = cForm.code.trim().toLowerCase();
+    const memberCode = cForm.memberCode.trim();
+    const code = memberCode.toLowerCase();
     if (accounts[code]) {
-      setCErr("這個登入代碼已經有人在用了，換一個試試");
+      setCErr("這個會員編號已經有人在用了，換一個試試");
       return;
     }
     setAccounts(accs => ({
       ...accs,
       [code]: {
         code,
-        id: cForm.memberCode.trim(),
-        memberCode: cForm.memberCode.trim(),
+        id: memberCode,
+        memberCode,
         name: cForm.name.trim(),
+        address: cForm.address.trim(),
+        phone: cForm.phone.trim(),
+        contact: cForm.contact.trim(),
         role: "customer"
       }
     }));
     setCForm({
-      code: "",
       memberCode: "",
-      name: ""
+      name: "",
+      address: "",
+      phone: "",
+      contact: ""
     });
     setCErr("");
   };
@@ -5239,32 +5271,22 @@ function AccountsAdmin({
     }
   }, "🧑‍💼 新增客人帳號"), /*#__PURE__*/React.createElement("div", {
     style: adminLabel
-  }, "登入代碼 *"), /*#__PURE__*/React.createElement("input", {
-    value: cForm.code,
+  }, "會員編號 *（同時是客人的登入帳號）"), /*#__PURE__*/React.createElement("input", {
+    value: cForm.memberCode,
     onChange: e => {
       setCForm(f => ({
         ...f,
-        code: e.target.value
+        memberCode: e.target.value
       }));
       setCErr("");
     },
-    placeholder: "例：fengyang（客人登入用，英文/數字）",
-    autoCapitalize: "none",
+    placeholder: "例：A001",
+    autoCapitalize: "characters",
     autoCorrect: "off",
     style: adminInp
   }), /*#__PURE__*/React.createElement("div", {
     style: adminLabel
-  }, "會員編號 *"), /*#__PURE__*/React.createElement("input", {
-    value: cForm.memberCode,
-    onChange: e => setCForm(f => ({
-      ...f,
-      memberCode: e.target.value
-    })),
-    placeholder: "例：A001",
-    style: adminInp
-  }), /*#__PURE__*/React.createElement("div", {
-    style: adminLabel
-  }, "客戶名稱 *"), /*#__PURE__*/React.createElement("input", {
+  }, "會員名稱 *"), /*#__PURE__*/React.createElement("input", {
     value: cForm.name,
     onChange: e => setCForm(f => ({
       ...f,
@@ -5272,7 +5294,44 @@ function AccountsAdmin({
     })),
     placeholder: "例：豐漾",
     style: adminInp
-  }), cErr && /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
+    style: adminLabel
+  }, "取件地址"), /*#__PURE__*/React.createElement("input", {
+    value: cForm.address,
+    onChange: e => setCForm(f => ({
+      ...f,
+      address: e.target.value
+    })),
+    placeholder: "客人下單時的預設地址",
+    style: adminInp
+  }), /*#__PURE__*/React.createElement("div", {
+    style: adminLabel
+  }, "聯絡電話"), /*#__PURE__*/React.createElement("input", {
+    value: cForm.phone,
+    onChange: e => setCForm(f => ({
+      ...f,
+      phone: e.target.value
+    })),
+    placeholder: "客人下單時的預設電話",
+    style: adminInp
+  }), /*#__PURE__*/React.createElement("div", {
+    style: adminLabel
+  }, "聯絡人"), /*#__PURE__*/React.createElement("input", {
+    value: cForm.contact,
+    onChange: e => setCForm(f => ({
+      ...f,
+      contact: e.target.value
+    })),
+    placeholder: "客人下單時的預設聯絡人",
+    style: adminInp
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.textMuted,
+      marginTop: -8,
+      marginBottom: 14
+    }
+  }, "地址／電話／聯絡人設定後，客人下單時會自動帶入，可再修改"), cErr && /*#__PURE__*/React.createElement("div", {
     style: {
       color: C.red,
       fontSize: 12,
@@ -5577,6 +5636,11 @@ function App() {
     return /*#__PURE__*/React.createElement(AddCaseScreen, {
       customerName: account.name,
       memberCode: account.memberCode,
+      defaults: {
+        address: account.address || "",
+        phone: account.phone || "",
+        contact: account.contact || ""
+      },
       myCases: myCases,
       onLogout: () => setAccount(null),
       onSubmit: form => {
