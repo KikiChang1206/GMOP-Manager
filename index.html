@@ -3642,13 +3642,15 @@ function MainApp({
   me,
   meName,
   role,
-  vehicle,
-  startMileage,
   onLogout,
   cases,
   setCases
 }) {
   const [tab, setTab] = useState(0);
+  // 出發登記（車牌／里程）改成登入後自己按按鈕才登記，不再強制
+  const [vehicle, setVehicle] = useState(null);
+  const [startMileage, setStartMileage] = useState(null);
+  const [departModal, setDepartModal] = useState(false);
   const [pickupModal, setPickupModal] = useState(null);
   const [rejectModal, setRejectModal] = useState(null);
   const [emptyTripModal, setEmptyTripModal] = useState(null);
@@ -3835,7 +3837,7 @@ function MainApp({
       fontSize: 12,
       color: "rgba(255,255,255,0.7)"
     }
-  }, new Date().toLocaleDateString("zh-TW")), /*#__PURE__*/React.createElement("span", {
+  }, new Date().toLocaleDateString("zh-TW")), vehicle && /*#__PURE__*/React.createElement("span", {
     style: {
       background: "rgba(255,255,255,0.18)",
       border: "1px solid rgba(255,255,255,0.3)",
@@ -3901,7 +3903,24 @@ function MainApp({
     style: {
       marginTop: 12
     }
-  }, !tripReport ? /*#__PURE__*/React.createElement("button", {
+  }, !vehicle ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => setDepartModal(true),
+    style: {
+      width: "100%",
+      background: "rgba(255,255,255,0.15)",
+      border: "1px solid rgba(255,255,255,0.3)",
+      borderRadius: 10,
+      padding: "9px 14px",
+      color: C.white,
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6
+    }
+  }, "🚛 出發・登記車牌／里程") : !tripReport ? /*#__PURE__*/React.createElement("button", {
     onClick: () => setTripEndModal(true),
     style: {
       width: "100%",
@@ -4056,6 +4075,14 @@ function MainApp({
     vehicle: vehicle,
     onClose: () => setTripEndModal(false),
     onConfirm: handleTripEnd
+  }), departModal && /*#__PURE__*/React.createElement(DepartModal, {
+    driverName: meName,
+    onClose: () => setDepartModal(false),
+    onConfirm: (plate, mileage) => {
+      setVehicle(plate);
+      setStartMileage(mileage);
+      setDepartModal(false);
+    }
   }));
 }
 
@@ -4222,10 +4249,10 @@ function LoginScreen({
 // ── Root App ──────────────────────────────────────────────
 // ── Vehicle Select Screen ─────────────────────────────────
 const VEHICLES = ["RDJ-8685", "RDT-6185", "BKV-1973"];
-function VehicleSelectScreen({
+function DepartModal({
   driverName,
   onConfirm,
-  onBack
+  onClose
 }) {
   const [selected, setSelected] = useState(null);
   const [custom, setCustom] = useState("");
@@ -4235,51 +4262,49 @@ function VehicleSelectScreen({
   const canGo = plate && mileage.trim() !== "";
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      background: `linear-gradient(160deg,${C.navy} 0%,${C.blue} 55%,${C.blueMid} 100%)`,
-      minHeight: "100vh",
+      position: "fixed",
+      inset: 0,
+      background: "rgba(20,40,80,0.55)",
+      zIndex: 200,
       display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 24,
-      fontFamily: "'Inter','Noto Sans TC',system-ui,sans-serif"
-    }
+      alignItems: "flex-end"
+    },
+    onClick: onClose
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "rgba(255,255,255,0.15)",
-      borderRadius: 20,
-      width: 64,
-      height: 64,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 30,
-      marginBottom: 16,
-      backdropFilter: "blur(8px)"
-    }
-  }, "🚚"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: C.white,
-      fontSize: 20,
-      fontWeight: 900,
-      marginBottom: 2
-    }
-  }, driverName, "，今天開哪台車？"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "rgba(255,255,255,0.75)",
-      fontSize: 13,
-      marginBottom: 28
-    }
-  }, "請選擇車輛並填寫出發里程"), /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.white,
-      borderRadius: 20,
-      padding: 24,
+      borderRadius: "22px 22px 0 0",
       width: "100%",
-      maxWidth: 340,
-      boxShadow: "0 8px 32px rgba(0,0,0,0.2)"
-    }
+      maxWidth: 460,
+      margin: "0 auto",
+      padding: "18px 20px 40px",
+      maxHeight: "92vh",
+      overflowY: "auto",
+      boxSizing: "border-box"
+    },
+    onClick: e => e.stopPropagation()
   }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 40,
+      height: 5,
+      background: C.grayBorder,
+      borderRadius: 3,
+      margin: "0 auto 16px"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      fontWeight: 900,
+      color: C.text,
+      marginBottom: 2
+    }
+  }, "🚛 出發登記"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.textSub,
+      fontSize: 13,
+      marginBottom: 18
+    }
+  }, "請選擇車輛並填寫出發里程"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -4417,7 +4442,7 @@ function VehicleSelectScreen({
       boxShadow: canGo ? C.shadowBlue : "none"
     }
   }, "確認出發"), /*#__PURE__*/React.createElement("button", {
-    onClick: onBack,
+    onClick: onClose,
     style: {
       width: "100%",
       background: "transparent",
@@ -4427,7 +4452,7 @@ function VehicleSelectScreen({
       fontSize: 13,
       cursor: "pointer"
     }
-  }, "← 返回登入")));
+  }, "取消")));
 }
 
 // ── Add Case Screen (客戶新增取件需求) ──────────────────────
@@ -5490,8 +5515,6 @@ function AdminScreen({
 
 function App() {
   const [account, setAccount] = useState(null);
-  const [vehicle, setVehicle] = useState(null);
-  const [startMileage, setStartMileage] = useState(null);
   const [cases, setCases] = useFirebaseList("cases", initCases);
   const [accounts, setAccounts] = useFirebaseObject("accounts", DEFAULT_ACCOUNTS);
   // 用最新的帳號資料更新司機清單，讓 dName/dPhone/TeamTab/AssignModal 都拿到最新司機。
@@ -5550,29 +5573,14 @@ function App() {
       }
     });
   }
-  if (!vehicle) {
-    return /*#__PURE__*/React.createElement(VehicleSelectScreen, {
-      driverName: account.name,
-      onConfirm: (plate, mileage) => {
-        setVehicle(plate);
-        setStartMileage(mileage);
-      },
-      onBack: () => setAccount(null)
-    });
-  }
+  // 司機／隊長：登入後直接進入案件畫面，出發登記（車牌／里程）改由畫面上的按鈕觸發
   return /*#__PURE__*/React.createElement(MainApp, {
     me: account.id,
     meName: account.name,
     role: account.role,
-    vehicle: vehicle,
-    startMileage: startMileage,
     cases: cases,
     setCases: setCases,
-    onLogout: () => {
-      setAccount(null);
-      setVehicle(null);
-      setStartMileage(null);
-    }
+    onLogout: () => setAccount(null)
   });
 }
 
