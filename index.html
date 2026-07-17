@@ -603,6 +603,13 @@ const STATUS_CFG = {
     soft: C.redSoft,
     icon: "⚠️",
     label: "退回"
+  },
+  已取消: {
+    color: C.gray,
+    light: C.grayLight,
+    soft: C.grayLight,
+    icon: "🚫",
+    label: "已取消"
   }
 };
 // 客人視角看到的狀態名稱（跟司機／隊長看到的內部狀態對應）
@@ -648,6 +655,13 @@ const CUSTOMER_STATUS_CFG = {
     soft: C.redSoft,
     icon: "⚠️",
     label: "已退回"
+  },
+  已取消: {
+    color: C.gray,
+    light: C.grayLight,
+    soft: C.grayLight,
+    icon: "🚫",
+    label: "已取消"
   }
 };
 const initCases = [
@@ -1422,57 +1436,54 @@ function PickupModal({
     }
   }, "確認取件・", c.customer, " ", c.name), /*#__PURE__*/React.createElement("div", {
     style: {
+      fontSize: 12,
+      color: C.textSub,
+      fontWeight: 600,
+      marginBottom: 6
+    }
+  }, "實際取件數（可直接輸入）"), /*#__PURE__*/React.createElement("div", {
+    style: {
       display: "flex",
       alignItems: "center",
-      background: C.grayLight,
-      borderRadius: 14,
-      padding: 4,
-      marginBottom: 14
+      gap: 10,
+      marginBottom: pcs !== net(c) ? 4 : 14
     }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setPcs(p => Math.max(1, p - 1)),
-    style: {
-      width: 48,
-      height: 48,
-      background: pcs > 1 ? C.blue : C.grayBorder,
-      border: "none",
-      borderRadius: 11,
-      color: pcs > 1 ? C.white : C.textMuted,
-      fontSize: 24,
-      cursor: "pointer",
-      fontWeight: 700
-    }
-  }, "−"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    inputMode: "numeric",
+    min: "0",
+    value: pcs,
+    onChange: e => {
+      const v = e.target.value;
+      setPcs(v === "" ? "" : Math.max(0, parseInt(v, 10) || 0));
+    },
     style: {
       flex: 1,
-      textAlign: "center"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 30,
-      fontWeight: 900,
+      background: C.grayLight,
+      border: `1.5px solid ${pcs !== net(c) ? C.orange : C.grayBorder}`,
+      borderRadius: 14,
+      padding: "14px 16px",
       color: pcs !== net(c) ? C.orange : C.text,
-      lineHeight: 1
+      fontSize: 26,
+      fontWeight: 900,
+      textAlign: "center",
+      boxSizing: "border-box",
+      outline: "none",
+      fontFamily: "inherit"
     }
-  }, pcs), pcs !== net(c) && /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 11,
-      color: C.orange
-    }
-  }, "原始 ", net(c), " 件")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setPcs(p => p + 1),
-    style: {
-      width: 48,
-      height: 48,
-      background: C.navy,
-      border: "none",
-      borderRadius: 11,
-      color: C.white,
-      fontSize: 24,
-      cursor: "pointer",
+      fontSize: 16,
+      color: C.textSub,
       fontWeight: 700
     }
-  }, "＋")), /*#__PURE__*/React.createElement("input", {
+  }, "件")), pcs !== net(c) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.orange,
+      marginBottom: 14
+    }
+  }, "⚠️ 與原始件數 ", net(c), " 件不符"), /*#__PURE__*/React.createElement("input", {
     value: address,
     onChange: e => setAddress(e.target.value),
     style: {
@@ -1640,7 +1651,13 @@ function PickupModal({
       fontWeight: 700
     }
   }, "重拍")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setStep(2),
+    onClick: () => {
+      if (pcs === "" || pcs < 1) {
+        setPcs(net(c));
+        return;
+      }
+      setStep(2);
+    },
     style: {
       width: "100%",
       background: `linear-gradient(135deg,${C.blue},${C.blueMid})`,
@@ -1771,6 +1788,208 @@ function RejectModal({
   }, "取消")));
 }
 
+// ── Empty-trip modal（司機跑空趟：取消收件 / 改其他日期）──
+function EmptyTripModal({
+  c,
+  onClose,
+  onCancelPickup,
+  onReschedule
+}) {
+  const [mode, setMode] = useState(null); // null | "cancel" | "reschedule"
+  const [date, setDate] = useState(c.pickup_date || todayStr());
+  const [note, setNote] = useState("");
+  const inp = {
+    width: "100%",
+    background: C.grayLight,
+    border: `1.5px solid ${C.grayBorder}`,
+    borderRadius: 12,
+    padding: "12px 14px",
+    color: C.text,
+    fontSize: 15,
+    boxSizing: "border-box",
+    outline: "none",
+    fontFamily: "inherit",
+    marginBottom: 12
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(20,40,80,0.55)",
+      zIndex: 300,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.white,
+      borderRadius: 22,
+      padding: 26,
+      width: "100%",
+      maxWidth: 360
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 40,
+      textAlign: "center",
+      marginBottom: 10
+    }
+  }, "🚫"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 900,
+      fontSize: 17,
+      color: C.text,
+      textAlign: "center",
+      marginBottom: 6
+    }
+  }, "跑空趟・沒收到貨"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: C.textSub,
+      textAlign: "center",
+      marginBottom: 18
+    }
+  }, c.customer, "・", c.name),
+  // 選擇模式
+  !mode && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMode("reschedule"),
+    style: {
+      width: "100%",
+      background: `linear-gradient(135deg,${C.blue},${C.blueMid})`,
+      border: "none",
+      borderRadius: 14,
+      padding: 15,
+      color: C.white,
+      fontSize: 15,
+      fontWeight: 800,
+      cursor: "pointer",
+      marginBottom: 10
+    }
+  }, "📅 改其他日期"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMode("cancel"),
+    style: {
+      width: "100%",
+      background: C.white,
+      border: `1.5px solid ${C.red}`,
+      borderRadius: 14,
+      padding: 14,
+      color: C.red,
+      fontSize: 15,
+      fontWeight: 800,
+      cursor: "pointer",
+      marginBottom: 10
+    }
+  }, "🚫 取消這筆收件"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      width: "100%",
+      background: "transparent",
+      border: "none",
+      padding: 8,
+      color: C.textMuted,
+      fontSize: 14,
+      cursor: "pointer"
+    }
+  }, "返回")),
+  // 改期
+  mode === "reschedule" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.textSub,
+      fontWeight: 600,
+      marginBottom: 6
+    }
+  }, "新的取件日期"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: date,
+    onChange: e => setDate(e.target.value),
+    style: inp
+  }), /*#__PURE__*/React.createElement("textarea", {
+    value: note,
+    onChange: e => setNote(e.target.value),
+    placeholder: "備註原因（選填）",
+    rows: 2,
+    style: {
+      ...inp,
+      resize: "none"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => date && onReschedule(date, note.trim()),
+    style: {
+      width: "100%",
+      background: `linear-gradient(135deg,${C.blue},${C.blueMid})`,
+      border: "none",
+      borderRadius: 14,
+      padding: 15,
+      color: C.white,
+      fontSize: 15,
+      fontWeight: 800,
+      cursor: "pointer",
+      marginBottom: 10
+    }
+  }, "確認改期"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMode(null),
+    style: {
+      width: "100%",
+      background: "transparent",
+      border: `1.5px solid ${C.grayBorder}`,
+      borderRadius: 14,
+      padding: 13,
+      color: C.textSub,
+      fontSize: 14,
+      cursor: "pointer"
+    }
+  }, "← 返回")),
+  // 取消
+  mode === "cancel" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: C.textSub,
+      textAlign: "center",
+      marginBottom: 14
+    }
+  }, "確定要取消這筆收件嗎？"), /*#__PURE__*/React.createElement("textarea", {
+    value: note,
+    onChange: e => setNote(e.target.value),
+    placeholder: "備註原因（選填）",
+    rows: 2,
+    style: {
+      ...inp,
+      resize: "none"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onCancelPickup(note.trim()),
+    style: {
+      width: "100%",
+      background: `linear-gradient(135deg,${C.red},#C53030)`,
+      border: "none",
+      borderRadius: 14,
+      padding: 15,
+      color: C.white,
+      fontSize: 15,
+      fontWeight: 800,
+      cursor: "pointer",
+      marginBottom: 10
+    }
+  }, "確認取消收件"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMode(null),
+    style: {
+      width: "100%",
+      background: "transparent",
+      border: `1.5px solid ${C.grayBorder}`,
+      borderRadius: 14,
+      padding: 13,
+      color: C.textSub,
+      fontSize: 14,
+      cursor: "pointer"
+    }
+  }, "← 返回"))));
+}
+
 // ── Overflow button ─────────────────────────────────────
 function OverflowBtn({
   items
@@ -1853,6 +2072,7 @@ function CaseCard({
   onPickup,
   onReject,
   onUndo,
+  onEmptyTrip,
   readOnly = false,
   canRevoke = false,
   onSession
@@ -2061,12 +2281,17 @@ function CaseCard({
       label: "撤銷結案",
       color: C.orange,
       action: onUndo
-    }] : [{
+    }] : [onEmptyTrip && {
+      icon: "🚫",
+      label: "跑空趟／沒收貨",
+      color: C.red,
+      action: onEmptyTrip
+    }, {
       icon: "↩️",
       label: "退回給隊長",
       color: C.orange,
       action: onReject
-    }]
+    }].filter(Boolean)
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       background: cfg.soft,
@@ -2324,6 +2549,7 @@ function MyCasesTab({
   onPickup,
   onReject,
   onUndo,
+  onEmptyTrip,
   onReorder,
   onSession
 }) {
@@ -2500,7 +2726,8 @@ function MyCasesTab({
     onAccept: () => onAccept(c.id),
     onPickup: () => onPickup(c.id),
     onReject: () => onReject(c.id),
-    onUndo: () => onUndo(c.id)
+    onUndo: () => onUndo(c.id),
+    onEmptyTrip: () => onEmptyTrip(c.id)
   })))));
 }
 
@@ -3424,6 +3651,7 @@ function MainApp({
   const [tab, setTab] = useState(0);
   const [pickupModal, setPickupModal] = useState(null);
   const [rejectModal, setRejectModal] = useState(null);
+  const [emptyTripModal, setEmptyTripModal] = useState(null);
   const [assignTarget, setAssignTarget] = useState(null);
   const [tripEndModal, setTripEndModal] = useState(false);
   const [tripReport, setTripReport] = useState(null);
@@ -3472,6 +3700,26 @@ function MainApp({
     status: "待取件",
     pickup_at: null
   } : c));
+  const handleCancelPickup = (id, note) => {
+    setCases(cs => cs.map(c => c.id === id ? {
+      ...c,
+      status: "已取消",
+      remark: note ? `🚫 跑空趟取消：${note}` : `🚫 跑空趟取消`
+    } : c));
+    setEmptyTripModal(null);
+  };
+  const handleReschedule = (id, date, note) => {
+    setCases(cs => cs.map(c => c.id === id ? {
+      ...c,
+      status: "待指派",
+      driver_id: null,
+      pickup_date: date,
+      returned: true,
+      wait_min: 0,
+      remark: note ? `📅 改期至 ${date}：${note}` : `📅 改期至 ${date}`
+    } : c));
+    setEmptyTripModal(null);
+  };
   const handleSession = (id, session) => setCases(cs => cs.map(c => c.id === id ? {
     ...c,
     session
@@ -3502,6 +3750,7 @@ function MainApp({
   };
   const mc = cases.find(c => c.id === pickupModal);
   const rc = cases.find(c => c.id === rejectModal);
+  const ec = cases.find(c => c.id === emptyTripModal);
   const isCaptain = role === "captain";
   const TABS = isCaptain ? [{
     label: "我的案件",
@@ -3707,6 +3956,7 @@ function MainApp({
     onPickup: id => setPickupModal(id),
     onReject: id => setRejectModal(id),
     onUndo: handleUndo,
+    onEmptyTrip: id => setEmptyTripModal(id),
     onReorder: handleReorder,
     onSession: handleSession
   }), isCaptain && tab === 1 && /*#__PURE__*/React.createElement(TeamTab, {
@@ -3792,6 +4042,11 @@ function MainApp({
     c: rc,
     onClose: () => setRejectModal(null),
     onConfirm: r => handleReject(rejectModal, r)
+  }), emptyTripModal && ec && /*#__PURE__*/React.createElement(EmptyTripModal, {
+    c: ec,
+    onClose: () => setEmptyTripModal(null),
+    onCancelPickup: note => handleCancelPickup(emptyTripModal, note),
+    onReschedule: (date, note) => handleReschedule(emptyTripModal, date, note)
   }), assignTarget && /*#__PURE__*/React.createElement(AssignModal, {
     cases: assignTarget,
     onClose: () => setAssignTarget(null),
@@ -4620,7 +4875,10 @@ function AccountsAdmin({
   });
   const [dErr, setDErr] = useState("");
   const [cErr, setCErr] = useState("");
-  const drivers = Object.values(accounts).filter(a => a.role === "driver" || a.role === "captain").sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+  const STAFF_ROLES = ["driver", "captain", "admin"];
+  const roleName = r => r === "admin" ? "管理者" : r === "captain" ? "隊長" : "司機";
+  const staff = Object.values(accounts).filter(a => STAFF_ROLES.includes(a.role)).sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+  const adminCount = staff.filter(a => a.role === "admin").length;
   const customers = Object.values(accounts).filter(a => a.role === "customer").sort((a, b) => (a.memberCode || "").localeCompare(b.memberCode || ""));
   const dCanSubmit = dForm.code.trim() && dForm.name.trim();
   const cCanSubmit = cForm.code.trim() && cForm.memberCode.trim() && cForm.name.trim();
@@ -4635,7 +4893,7 @@ function AccountsAdmin({
       ...accs,
       [code]: {
         code,
-        id: "DRV" + Date.now().toString().slice(-6),
+        id: (dForm.role === "admin" ? "ADM" : "DRV") + Date.now().toString().slice(-6),
         name: dForm.name.trim(),
         phone: dForm.phone.trim(),
         role: dForm.role
@@ -4673,14 +4931,26 @@ function AccountsAdmin({
     });
     setCErr("");
   };
-  const toggleRole = code => setAccounts(accs => ({
-    ...accs,
-    [code]: {
-      ...accs[code],
-      role: accs[code].role === "captain" ? "driver" : "captain"
+  const changeRole = (code, newRole) => {
+    const cur = accounts[code];
+    if (cur.role === newRole) return;
+    if (cur.role === "admin" && newRole !== "admin" && adminCount <= 1) {
+      window.alert("至少要保留一位管理者，無法把最後一位管理者改成其他角色。");
+      return;
     }
-  }));
+    setAccounts(accs => ({
+      ...accs,
+      [code]: {
+        ...accs[code],
+        role: newRole
+      }
+    }));
+  };
   const del = (code, name) => {
+    if (accounts[code] && accounts[code].role === "admin" && adminCount <= 1) {
+      window.alert("至少要保留一位管理者，無法刪除最後一位管理者。");
+      return;
+    }
     if (!window.confirm(`確定要刪除帳號「${name}」嗎？`)) return;
     setAccounts(accs => {
       const next = {
@@ -4735,7 +5005,7 @@ function AccountsAdmin({
       color: C.text,
       marginBottom: 14
     }
-  }, "🚚 新增司機／隊長"), /*#__PURE__*/React.createElement("div", {
+  }, "🚚 新增員工（司機／隊長／管理者）"), /*#__PURE__*/React.createElement("div", {
     style: adminLabel
   }, "登入代碼 *"), /*#__PURE__*/React.createElement("input", {
     value: dForm.code,
@@ -4746,7 +5016,7 @@ function AccountsAdmin({
       }));
       setDErr("");
     },
-    placeholder: "例：ahua（司機登入用，英文/數字）",
+    placeholder: "例：ahua（登入用，英文/數字）",
     autoCapitalize: "none",
     autoCorrect: "off",
     style: adminInp
@@ -4778,7 +5048,7 @@ function AccountsAdmin({
       gap: 8,
       marginBottom: 14
     }
-  }, ["driver", "captain"].map(r => /*#__PURE__*/React.createElement("button", {
+  }, STAFF_ROLES.map(r => /*#__PURE__*/React.createElement("button", {
     key: r,
     onClick: () => setDForm(f => ({
       ...f,
@@ -4795,7 +5065,7 @@ function AccountsAdmin({
       fontWeight: 700,
       cursor: "pointer"
     }
-  }, r === "driver" ? "司機" : "隊長"))), dErr && /*#__PURE__*/React.createElement("div", {
+  }, roleName(r)))), dErr && /*#__PURE__*/React.createElement("div", {
     style: {
       color: C.red,
       fontSize: 12,
@@ -4815,7 +5085,7 @@ function AccountsAdmin({
       fontWeight: 800,
       cursor: dCanSubmit ? "pointer" : "default"
     }
-  }, "新增司機／隊長")),
+  }, "新增員工")),
   /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 800,
@@ -4823,9 +5093,20 @@ function AccountsAdmin({
       color: C.textSub,
       marginBottom: 10
     }
-  }, "目前的司機／隊長（", drivers.length, "）"), drivers.map(a => /*#__PURE__*/React.createElement("div", {
+  }, "目前的員工（", staff.length, "）"), staff.map(a => /*#__PURE__*/React.createElement("div", {
     key: a.code,
-    style: rowBox
+    style: {
+      ...rowBox,
+      flexDirection: "column",
+      alignItems: "stretch",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between"
+    }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       minWidth: 0,
@@ -4841,31 +5122,52 @@ function AccountsAdmin({
     style: {
       fontSize: 11,
       fontWeight: 800,
-      color: a.role === "captain" ? C.blue : C.gray,
-      background: a.role === "captain" ? C.blueSoft : C.grayLight,
+      color: a.role === "admin" ? C.orange : a.role === "captain" ? C.blue : C.gray,
+      background: a.role === "admin" ? C.orangeLight : a.role === "captain" ? C.blueSoft : C.grayLight,
       borderRadius: 6,
       padding: "2px 7px",
       marginLeft: 4
     }
-  }, a.role === "captain" ? "隊長" : "司機")), /*#__PURE__*/React.createElement("div", {
+  }, roleName(a.role))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: C.textMuted,
       marginTop: 2
     }
-  }, "代碼：", a.code, a.phone ? `・${a.phone}` : "")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 6,
-      flexShrink: 0
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => toggleRole(a.code),
-    style: smallBtn(C.blueSoft, C.blueLight, C.blue)
-  }, a.role === "captain" ? "改為司機" : "設為隊長"), /*#__PURE__*/React.createElement("button", {
+  }, "代碼：", a.code, a.phone ? `・${a.phone}` : "")), /*#__PURE__*/React.createElement("button", {
     onClick: () => del(a.code, a.name),
     style: smallBtn("transparent", C.redLight, C.red)
-  }, "刪除")))),
+  }, "刪除")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.textSub,
+      fontWeight: 600
+    }
+  }, "角色："), /*#__PURE__*/React.createElement("select", {
+    value: a.role,
+    onChange: e => changeRole(a.code, e.target.value),
+    style: {
+      flex: 1,
+      background: C.grayLight,
+      border: `1.5px solid ${C.grayBorder}`,
+      borderRadius: 10,
+      padding: "9px 12px",
+      color: C.text,
+      fontSize: 14,
+      fontWeight: 700,
+      fontFamily: "inherit",
+      outline: "none"
+    }
+  }, STAFF_ROLES.map(r => /*#__PURE__*/React.createElement("option", {
+    key: r,
+    value: r
+  }, roleName(r))))))),
   // ── 客人 帳號 ──
   /*#__PURE__*/React.createElement("div", {
     style: {
