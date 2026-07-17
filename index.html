@@ -2226,30 +2226,13 @@ function CaseCard({
       justifyContent: "center",
       flexShrink: 0
     }
-  }, routeNum), c.status === "已指派" && !readOnly && /*#__PURE__*/React.createElement("div", {
+  }, routeNum), (c.pickup_date || c.pickup_time) && /*#__PURE__*/React.createElement("span", {
     style: {
-      width: 7,
-      height: 7,
-      borderRadius: "50%",
-      background: C.pink,
-      flexShrink: 0
+      color: C.text,
+      fontSize: 17,
+      fontWeight: 800
     }
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      background: cfg.soft,
-      color: cfg.color,
-      fontSize: 11,
-      padding: "3px 9px",
-      borderRadius: 20,
-      fontWeight: 700,
-      border: `1px solid ${cfg.light}`
-    }
-  }, cfg.icon, " ", cfg.label), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: C.textMuted,
-      fontSize: 11
-    }
-  }, c.pickup_time)), /*#__PURE__*/React.createElement("div", {
+  }, "🕐 ", c.pickup_time || c.pickup_date)), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 20,
       fontWeight: 900,
@@ -2565,7 +2548,7 @@ function MyCasesTab({
     cases: myCases.filter(c => c.status === "已指派")
   }, {
     label: "待取件",
-    color: C.navy,
+    color: "#111827",
     cases: myCases.filter(c => c.status === "待取件" || c.status === "已接單").sort((a, b) => a.order - b.order)
   }, {
     label: "已取件",
@@ -2751,7 +2734,7 @@ function TeamTab({
     cases: driverCases.filter(c => c.status === "已指派")
   }, {
     label: "待取件",
-    color: C.navy,
+    color: "#111827",
     cases: driverCases.filter(c => c.status === "待取件" || c.status === "已接單")
   }, {
     label: "已取件",
@@ -3644,23 +3627,34 @@ function MainApp({
   role,
   onLogout,
   cases,
-  setCases
+  setCases,
+  trips,
+  setTrips
 }) {
   const [tab, setTab] = useState(0);
-  // 出發登記（車牌／里程）改成登入後自己按按鈕才登記，不再強制
-  const [vehicle, setVehicle] = useState(null);
-  const [startMileage, setStartMileage] = useState(null);
+  // 出發登記（車牌／里程）改成登入後自己按按鈕才登記，不再強制。資料存在雲端 trips[me]。
+  const myTrip = (trips && trips[me]) || {};
+  const vehicle = myTrip.plate || null;
+  const startMileage = myTrip.startMileage || null;
+  // 其他司機正在使用中的車牌（尚未回報回程的）→ 不可重複選
+  const takenPlates = Object.keys(trips || {}).filter(id => id !== me).map(id => trips[id]).filter(t => t && t.plate && !t.report).map(t => t.plate);
   const [departModal, setDepartModal] = useState(false);
   const [pickupModal, setPickupModal] = useState(null);
   const [rejectModal, setRejectModal] = useState(null);
   const [emptyTripModal, setEmptyTripModal] = useState(null);
   const [assignTarget, setAssignTarget] = useState(null);
   const [tripEndModal, setTripEndModal] = useState(false);
-  const [tripReport, setTripReport] = useState(null);
+  const tripReport = myTrip.report || null;
   const alertCount = cases.filter(c => c.status === "已指派" && c.wait_min >= 5).length;
   const pendingCount = cases.filter(c => c.status === "待指派").length;
   const handleTripEnd = report => {
-    setTripReport(report);
+    setTrips(t => ({
+      ...t,
+      [me]: {
+        ...(t[me] || {}),
+        report
+      }
+    }));
     setTripEndModal(false);
   };
   const handleAccept = id => setCases(cs => cs.map(c => c.id === id ? {
@@ -4082,10 +4076,18 @@ function MainApp({
     driverName: meName,
     initialPlate: vehicle,
     initialMileage: startMileage,
+    takenPlates: takenPlates,
     onClose: () => setDepartModal(false),
     onConfirm: (plate, mileage) => {
-      setVehicle(plate);
-      setStartMileage(mileage);
+      setTrips(t => ({
+        ...t,
+        [me]: {
+          ...(t[me] || {}),
+          plate,
+          startMileage: mileage,
+          report: null
+        }
+      }));
       setDepartModal(false);
     }
   }));
@@ -4258,6 +4260,7 @@ function DepartModal({
   driverName,
   initialPlate,
   initialMileage,
+  takenPlates = [],
   onConfirm,
   onClose
 }) {
@@ -4267,7 +4270,8 @@ function DepartModal({
   const [useCustom, setUseCustom] = useState(!!(initialPlate && !initialIsPreset));
   const [mileage, setMileage] = useState(initialMileage ? String(initialMileage) : "");
   const plate = useCustom ? custom.trim().toUpperCase() : selected;
-  const canGo = plate && mileage.trim() !== "";
+  const isTaken = p => takenPlates.includes(p);
+  const canGo = plate && mileage.trim() !== "" && !isTaken(plate);
   const isEdit = !!initialPlate;
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4320,41 +4324,53 @@ function DepartModal({
       gap: 10,
       marginBottom: 16
     }
-  }, VEHICLES.map(v => /*#__PURE__*/React.createElement("button", {
-    key: v,
-    onClick: () => {
-      setSelected(v);
-      setUseCustom(false);
-    },
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-      background: !useCustom && selected === v ? C.blueSoft : C.grayLight,
-      border: `1.5px solid ${!useCustom && selected === v ? C.blue : C.grayBorder}`,
-      borderRadius: 14,
-      padding: "14px 16px",
-      cursor: "pointer"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 20
-    }
-  }, "🚐"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      flex: 1,
-      textAlign: "left",
-      fontSize: 16,
-      fontWeight: 800,
-      color: !useCustom && selected === v ? C.blue : C.text,
-      letterSpacing: 1
-    }
-  }, v), !useCustom && selected === v && /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: C.blue,
-      fontSize: 18
-    }
-  }, "✓")))), /*#__PURE__*/React.createElement("div", {
+  }, VEHICLES.map(v => {
+    const taken = isTaken(v);
+    return /*#__PURE__*/React.createElement("button", {
+      key: v,
+      disabled: taken,
+      onClick: () => {
+        if (taken) return;
+        setSelected(v);
+        setUseCustom(false);
+      },
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        background: taken ? C.grayLight : !useCustom && selected === v ? C.blueSoft : C.grayLight,
+        border: `1.5px solid ${!useCustom && selected === v && !taken ? C.blue : C.grayBorder}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        cursor: taken ? "not-allowed" : "pointer",
+        opacity: taken ? 0.55 : 1
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 20
+      }
+    }, "🚐"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        textAlign: "left",
+        fontSize: 16,
+        fontWeight: 800,
+        color: taken ? C.textMuted : !useCustom && selected === v ? C.blue : C.text,
+        letterSpacing: 1
+      }
+    }, v), taken ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.textMuted,
+        fontSize: 12,
+        fontWeight: 700
+      }
+    }, "使用中") : !useCustom && selected === v && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.blue,
+        fontSize: 18
+      }
+    }, "✓"));
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -4434,7 +4450,13 @@ function DepartModal({
       fontFamily: "inherit",
       fontWeight: 700
     }
-  }), /*#__PURE__*/React.createElement("button", {
+  }), plate && isTaken(plate) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.red,
+      fontSize: 12,
+      marginBottom: 12
+    }
+  }, "⚠️ 車牌 ", plate, " 已有其他司機使用中，請換一台"), /*#__PURE__*/React.createElement("button", {
     onClick: () => canGo && onConfirm(plate, mileage),
     disabled: !canGo,
     style: {
@@ -5526,6 +5548,8 @@ function App() {
   const [account, setAccount] = useState(null);
   const [cases, setCases] = useFirebaseList("cases", initCases);
   const [accounts, setAccounts] = useFirebaseObject("accounts", DEFAULT_ACCOUNTS);
+  // 各司機的出發資訊（車牌／里程／回程回報），存在雲端讓大家都看得到，也避免車牌重複。
+  const [trips, setTrips] = useFirebaseObject("trips", {});
   // 用最新的帳號資料更新司機清單，讓 dName/dPhone/TeamTab/AssignModal 都拿到最新司機。
   DRIVERS = driversFromAccounts(accounts);
   if (!account) {
@@ -5589,6 +5613,8 @@ function App() {
     role: account.role,
     cases: cases,
     setCases: setCases,
+    trips: trips,
+    setTrips: setTrips,
     onLogout: () => setAccount(null)
   });
 }
