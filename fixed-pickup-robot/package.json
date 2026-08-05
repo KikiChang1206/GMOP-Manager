@@ -1,0 +1,22 @@
+{
+  "name": "fixed-pickup-robot",
+  "version": "1.0.0",
+  "description": "固定取件機器人 — 每日自動在 system.goodmaji.com 為固定配合客人新增取件單,避免遺漏。",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "server": "node src/server.js",
+    "run:daily": "node src/run.js",
+    "run:dry": "DRY_RUN=1 node src/run.js",
+    "install:browser": "npx playwright install --with-deps chromium"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "googleapis": "^140.0.1",
+    "nodemailer": "^6.9.14",
+    "playwright": "^1.45.0"
+  }
+}

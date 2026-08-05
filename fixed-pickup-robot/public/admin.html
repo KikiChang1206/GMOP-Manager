@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>固定取件管理｜GoodMaji</title>
+<meta name="theme-color" content="#1A4A8A" />
+<style>
+  :root{--brand:#1A4A8A;--bg:#F0F4FA;--line:#dbe3ef;--text:#1f2a3a;--muted:#6b7891;
+    --ok:#1f9d63;--danger:#d64545;--warn:#c98a00}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,"PingFang TC","Noto Sans TC",system-ui,sans-serif}
+  header{background:var(--brand);color:#fff;padding:16px 20px;display:flex;
+    align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  header h1{margin:0;font-size:18px}
+  .tabs{display:flex;gap:8px}
+  .tabs button{padding:7px 14px;border:1px solid rgba(255,255,255,.5);background:transparent;
+    color:#fff;border-radius:8px;font-size:14px;cursor:pointer}
+  .tabs button.on{background:#fff;color:var(--brand);font-weight:700}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+  .gate{max-width:340px;margin:80px auto;background:#fff;border:1px solid var(--line);
+    border-radius:14px;padding:24px;text-align:center}
+  .gate input{width:100%;padding:11px;border:1px solid var(--line);border-radius:9px;
+    font-size:16px;margin:14px 0}
+  .gate button,.reload{background:var(--brand);color:#fff;border:none;padding:11px 18px;
+    border-radius:9px;font-size:15px;font-weight:600;cursor:pointer}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;
+    box-shadow:0 1px 4px rgba(0,0,0,.05);font-size:13px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{background:#eef3fb;font-size:12px;color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+  .pill{padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600}
+  .pill.active{background:#e9f8f0;color:var(--ok)}
+  .pill.paused{background:#f1f1f4;color:var(--muted)}
+  .pill.ok{background:#e9f8f0;color:var(--ok)}
+  .pill.fail{background:#fdecec;color:var(--danger)}
+  .act{padding:5px 11px;border:1px solid var(--line);background:#fff;border-radius:7px;
+    font-size:12px;cursor:pointer;color:var(--brand);font-weight:600}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px}
+  .count{color:var(--muted);font-size:13px}
+  .scroll{overflow-x:auto}
+  .empty{text-align:center;color:var(--muted);padding:40px;background:#fff;border-radius:12px}
+  .err{color:var(--danger);font-size:14px;margin-top:8px}
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate">
+  <h1 style="color:var(--brand);margin:0">管理者登入</h1>
+  <input type="password" id="pw" placeholder="請輸入管理密碼" />
+  <button onclick="login()">進入</button>
+  <div id="gateErr" class="err"></div>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>固定取件管理</h1>
+    <div class="tabs">
+      <button id="tabC" class="on" onclick="show('customers')">客人設定</button>
+      <button id="tabL" onclick="show('logs')">執行記錄</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <button class="reload" onclick="refresh()">重新整理</button>
+    </div>
+    <div class="scroll"><div id="content"></div></div>
+  </div>
+</div>
+
+<script>
+var PW='', view='customers';
+var WD=['','週一','週二','週三','週四','週五','週六','週日'];
+
+function login(){
+  PW = document.getElementById('pw').value;
+  api('/api/admin/customers').then(function(){
+    document.getElementById('gate').style.display='none';
+    document.getElementById('app').style.display='block';
+    refresh();
+  }).catch(function(){
+    document.getElementById('gateErr').textContent='密碼錯誤';
+  });
+}
+
+function api(path, opts){
+  opts = opts || {};
+  opts.headers = Object.assign({'x-admin-password':PW,'Content-Type':'application/json'}, opts.headers||{});
+  return fetch(path, opts).then(function(r){
+    if(!r.ok) throw new Error('unauthorized');
+    return r.json();
+  });
+}
+
+function show(v){
+  view=v;
+  document.getElementById('tabC').classList.toggle('on', v==='customers');
+  document.getElementById('tabL').classList.toggle('on', v==='logs');
+  refresh();
+}
+
+function freqText(c){
+  if(c.frequencyType==='daily') return '每天';
+  return '每週 ' + (c.weekdays||'').split(',').filter(Boolean)
+    .map(function(d){return WD[+d];}).join('、');
+}
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(m){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;'}[m]; }); }
+
+function refresh(){
+  if(view==='customers') loadCustomers(); else loadLogs();
+}
+
+function loadCustomers(){
+  api('/api/admin/customers').then(function(d){
+    var list = d.customers||[];
+    document.getElementById('count').textContent = '共 '+list.length+' 位客人';
+    if(!list.length){ document.getElementById('content').innerHTML='<div class="empty">尚無資料</div>'; return; }
+    var rows = list.map(function(c){
+      var st = c.status==='active';
+      return '<tr>'
+        +'<td>'+esc(c.name)+'</td>'
+        +'<td>'+esc(c.address)+'</td>'
+        +'<td>'+esc(c.fixedTime)+'</td>'
+        +'<td>'+esc(freqText(c))+'</td>'
+        +'<td>'+esc(c.effectiveDate)+'</td>'
+        +'<td>'+esc(c.contact)+'<br><span style="color:var(--muted)">'+esc(c.phone)+'</span></td>'
+        +'<td>'+esc(c.customerNote||'-')+'</td>'
+        +'<td><span class="pill '+(st?'active':'paused')+'">'+(st?'啟用':'暫停')+'</span></td>'
+        +'<td><button class="act" onclick="toggle(\''+c.customer_id+'\',\''+(st?'paused':'active')+'\')">'
+          +(st?'暫停':'啟用')+'</button></td>'
+        +'</tr>';
+    }).join('');
+    document.getElementById('content').innerHTML =
+      '<table><thead><tr><th>客戶</th><th>地址</th><th>時間</th><th>頻率</th><th>生效日</th>'
+      +'<th>聯絡</th><th>備註</th><th>狀態</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+  });
+}
+
+function loadLogs(){
+  api('/api/admin/logs').then(function(d){
+    var list = d.logs||[];
+    document.getElementById('count').textContent = '最近 '+list.length+' 筆執行記錄';
+    if(!list.length){ document.getElementById('content').innerHTML='<div class="empty">尚無執行記錄</div>'; return; }
+    var rows = list.map(function(l){
+      var ok = l.result==='成功';
+      return '<tr>'
+        +'<td>'+esc(l.runDate)+'</td>'
+        +'<td>'+esc(l.name)+'</td>'
+        +'<td><span class="pill '+(ok?'ok':'fail')+'">'+esc(l.result)+'</span></td>'
+        +'<td>'+esc(l.errorReason||'-')+'</td>'
+        +'<td style="color:var(--muted)">'+esc((l.timestamp||'').replace('T',' ').slice(0,19))+'</td>'
+        +'</tr>';
+    }).join('');
+    document.getElementById('content').innerHTML =
+      '<table><thead><tr><th>執行日期</th><th>客戶</th><th>結果</th><th>失敗原因</th><th>時間戳記</th></tr></thead><tbody>'
+      +rows+'</tbody></table>';
+  });
+}
+
+function toggle(id, status){
+  api('/api/admin/status', {method:'POST', body: JSON.stringify({customer_id:id, status:status})})
+    .then(function(){ loadCustomers(); });
+}
+
+document.getElementById('pw').addEventListener('keydown', function(e){ if(e.key==='Enter') login(); });
+</script>
+</body>
+</html>

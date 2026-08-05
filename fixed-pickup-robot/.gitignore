@@ -1,0 +1,21 @@
+# 環境敏感資訊 — 絕不進版控
+.env
+*.env
+!.env.example
+
+# 本機資料儲存(local 後端)
+data/*.json
+!data/.gitkeep
+
+# 執行記錄與截圖
+logs/*.log
+logs/screenshots/*.png
+!logs/.gitkeep
+!logs/screenshots/.gitkeep
+
+# Google 服務帳戶金鑰
+google-credentials.json
+*-credentials.json
+
+node_modules/
+npm-debug.log*

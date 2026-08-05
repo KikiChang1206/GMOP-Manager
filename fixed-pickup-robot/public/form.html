@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>固定取件設定｜GoodMaji</title>
+<meta name="theme-color" content="#1A4A8A" />
+<style>
+  :root{
+    --brand:#1A4A8A; --brand-d:#143a6e; --bg:#F0F4FA; --card:#fff;
+    --line:#dbe3ef; --text:#1f2a3a; --muted:#6b7891; --danger:#d64545; --ok:#1f9d63;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,"PingFang TC","Noto Sans TC",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:520px;margin:0 auto;padding:0 16px 48px}
+  header{background:linear-gradient(135deg,var(--brand),var(--brand-d));color:#fff;
+    padding:28px 20px 22px;border-radius:0 0 20px 20px;margin:0 -16px 20px;
+    box-shadow:0 4px 16px rgba(26,74,138,.25)}
+  header h1{margin:0 0 6px;font-size:20px;letter-spacing:.5px}
+  header p{margin:0;font-size:13px;opacity:.9;line-height:1.6}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:18px 16px;margin-bottom:14px}
+  label{display:block;font-size:14px;font-weight:600;margin:0 0 7px}
+  .req{color:var(--danger);margin-left:3px}
+  .hint{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+  input[type=text],input[type=tel],input[type=time],input[type=date],textarea{
+    width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:10px;
+    font-size:16px;color:var(--text);background:#fbfdff;outline:none;transition:.15s}
+  input:focus,textarea:focus{border-color:var(--brand);background:#fff;
+    box-shadow:0 0 0 3px rgba(26,74,138,.12)}
+  textarea{resize:vertical;min-height:72px}
+  .field{margin-bottom:16px}
+  .field:last-child{margin-bottom:0}
+  .seg{display:flex;gap:8px;margin-bottom:12px}
+  .seg button{flex:1;padding:11px;border:1px solid var(--line);background:#fbfdff;
+    border-radius:10px;font-size:15px;font-weight:600;color:var(--muted);cursor:pointer}
+  .seg button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .days button{padding:10px 0;border:1px solid var(--line);background:#fbfdff;
+    border-radius:9px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer}
+  .days button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .days.disabled{opacity:.4;pointer-events:none}
+  .submit{width:100%;padding:15px;background:var(--brand);color:#fff;border:none;
+    border-radius:12px;font-size:17px;font-weight:700;cursor:pointer;margin-top:4px;
+    box-shadow:0 4px 14px rgba(26,74,138,.3)}
+  .submit:active{transform:translateY(1px)}
+  .submit:disabled{opacity:.6}
+  .msg{padding:12px 14px;border-radius:10px;font-size:14px;line-height:1.6;margin-bottom:14px;display:none}
+  .msg.err{background:#fdecec;color:var(--danger);border:1px solid #f5c6c6;display:block}
+  .msg.ok{background:#e9f8f0;color:var(--ok);border:1px solid #b8e6cd;display:block}
+  .note-info{font-size:12px;color:var(--muted);line-height:1.7;margin-top:6px}
+  .done{text-align:center;padding:36px 20px}
+  .done .tick{width:64px;height:64px;border-radius:50%;background:var(--ok);color:#fff;
+    font-size:34px;line-height:64px;margin:0 auto 16px}
+  .done h2{margin:0 0 8px;font-size:20px}
+  .done p{color:var(--muted);font-size:14px;line-height:1.7}
+  .link-btn{margin-top:18px;display:inline-block;color:var(--brand);font-weight:600;
+    text-decoration:none;font-size:15px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>固定取件設定</h1>
+    <p>填一次、長期生效。設定後,系統每天會依你的頻率自動幫你安排取件,不用每天重打單。</p>
+  </header>
+
+  <div id="formView">
+    <div id="msg" class="msg"></div>
+    <form id="form" autocomplete="on">
+      <div class="card">
+        <div class="field">
+          <label>客戶名稱<span class="req">*</span></label>
+          <input type="text" name="name" placeholder="例如:東午月創意股份有限公司" required />
+        </div>
+        <div class="field">
+          <label>取件地址<span class="req">*</span></label>
+          <input type="text" name="address" placeholder="例如:台中市西區大隆路20號" required />
+        </div>
+        <div class="field">
+          <label>固定取件時間<span class="req">*</span><span class="hint">每天大約幾點</span></label>
+          <input type="time" name="fixedTime" required />
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="field">
+          <label>聯絡電話<span class="req">*</span></label>
+          <input type="tel" name="phone" placeholder="例如:04-12345678" required />
+        </div>
+        <div class="field">
+          <label>現場聯絡人<span class="req">*</span></label>
+          <input type="text" name="contact" placeholder="例如:王小姐" required />
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="field">
+          <label>取件頻率<span class="req">*</span></label>
+          <div class="seg" id="freqSeg">
+            <button type="button" data-freq="daily">每天</button>
+            <button type="button" data-freq="weekly" class="on">每週特定星期</button>
+          </div>
+          <div class="days" id="days">
+            <button type="button" data-d="1">一</button>
+            <button type="button" data-d="2">二</button>
+            <button type="button" data-d="3">三</button>
+            <button type="button" data-d="4">四</button>
+            <button type="button" data-d="5">五</button>
+            <button type="button" data-d="6">六</button>
+            <button type="button" data-d="7">日</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>生效日期<span class="req">*</span><span class="hint">從哪天開始套用</span></label>
+          <input type="date" name="effectiveDate" required />
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="field">
+          <label>備註<span class="hint">選填</span></label>
+          <textarea name="customerNote" placeholder="特殊叮嚀,例如:12-14點午休請避開"></textarea>
+          <div class="note-info">
+            ※ 每筆單子的包裹數會先帶 0、備註帶「件數確認中」,實際件數與指派司機由本公司人員後續補上,確保單子一定會出現在取件表上,不會被遺漏。
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="submit" id="submitBtn">送出設定</button>
+    </form>
+  </div>
+
+  <div id="doneView" class="done card" style="display:none">
+    <div class="tick">✓</div>
+    <h2>設定完成!</h2>
+    <p>你的固定取件已建立,系統會從生效日起,依設定的頻率每天自動幫你安排。<br/>若需請假或暫停,請聯絡本公司人員。</p>
+    <a class="link-btn" id="again">再新增一筆</a>
+  </div>
+</div>
+
+<script>
+(function(){
+  var freq = 'weekly';
+  var days = new Set();
+
+  var seg = document.getElementById('freqSeg');
+  var daysEl = document.getElementById('days');
+
+  seg.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    freq = b.dataset.freq;
+    seg.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on', x===b); });
+    daysEl.classList.toggle('disabled', freq==='daily');
+  });
+
+  daysEl.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    var d = b.dataset.d;
+    if(days.has(d)) days.delete(d); else days.add(d);
+    b.classList.toggle('on', days.has(d));
+  });
+
+  // 生效日期預設為今天
+  document.querySelector('[name=effectiveDate]').value = new Date().toISOString().slice(0,10);
+
+  var form = document.getElementById('form');
+  var msg = document.getElementById('msg');
+  var btn = document.getElementById('submitBtn');
+
+  function showMsg(type, text){
+    msg.className = 'msg ' + type;
+    msg.textContent = text;
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    msg.className = 'msg';
+
+    if(freq==='weekly' && days.size===0){
+      showMsg('err','取件頻率為每週時,請至少選一個星期。');
+      return;
+    }
+
+    var fd = new FormData(form);
+    var payload = {
+      name: fd.get('name'), address: fd.get('address'),
+      fixedTime: fd.get('fixedTime'), phone: fd.get('phone'),
+      contact: fd.get('contact'), effectiveDate: fd.get('effectiveDate'),
+      customerNote: fd.get('customerNote'),
+      frequencyType: freq,
+      weekdays: freq==='weekly' ? Array.from(days).join(',') : ''
+    };
+
+    btn.disabled = true; btn.textContent = '送出中…';
+    try{
+      var r = await fetch('/api/customers', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      var data = await r.json();
+      if(!r.ok || !data.ok){
+        showMsg('err', (data.errors ? data.errors.join('、') : data.error) || '送出失敗,請檢查欄位。');
+        return;
+      }
+      document.getElementById('formView').style.display='none';
+      document.getElementById('doneView').style.display='block';
+      window.scrollTo({top:0});
+    }catch(err){
+      showMsg('err','網路連線異常,請稍後再試。');
+    }finally{
+      btn.disabled=false; btn.textContent='送出設定';
+    }
+  });
+
+  document.getElementById('again').addEventListener('click', function(){
+    location.reload();
+  });
+})();
+</script>
+</body>
+</html>
