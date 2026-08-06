@@ -2,200 +2,240 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>固定取件設定｜GoodMaji</title>
-<meta name="theme-color" content="#1A4A8A" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#7FB2E6" />
 <style>
+  /* 固定亮色(藍+粉+灰+白):不跟隨系統深色模式,確保客人看到的永遠是亮色版 */
   :root{
-    --brand:#1A4A8A; --brand-d:#143a6e; --bg:#F0F4FA; --card:#fff;
-    --line:#dbe3ef; --text:#1f2a3a; --muted:#6b7891; --danger:#d64545; --ok:#1f9d63;
+    --blue:#5B9BD5; --blue-d:#4C8DD6; --blue-soft:#eaf2fb;
+    --pink:#EC8FB8; --pink-d:#e57aa9; --pink-soft:#fdeef4;
+    --bg:#f5f8fc; --card:#ffffff; --field:#f7fafd; --line:#e5ecf5;
+    --text:#3f4a5c; --muted:#8090a3; --faint:#aab4c4;
+    --danger:#e0637f; --danger-bg:#fdeef1;
+    --shadow:0 10px 30px rgba(90,130,190,.12);
   }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
-    font-family:-apple-system,"PingFang TC","Noto Sans TC",system-ui,sans-serif;
-    -webkit-font-smoothing:antialiased}
-  .wrap{max-width:520px;margin:0 auto;padding:0 16px 48px}
-  header{background:linear-gradient(135deg,var(--brand),var(--brand-d));color:#fff;
-    padding:28px 20px 22px;border-radius:0 0 20px 20px;margin:0 -16px 20px;
-    box-shadow:0 4px 16px rgba(26,74,138,.25)}
-  header h1{margin:0 0 6px;font-size:20px;letter-spacing:.5px}
-  header p{margin:0;font-size:13px;opacity:.9;line-height:1.6}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
-    padding:18px 16px;margin-bottom:14px}
-  label{display:block;font-size:14px;font-weight:600;margin:0 0 7px}
-  .req{color:var(--danger);margin-left:3px}
-  .hint{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
-  input[type=text],input[type=tel],input[type=time],input[type=date],textarea{
-    width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:10px;
-    font-size:16px;color:var(--text);background:#fbfdff;outline:none;transition:.15s}
-  input:focus,textarea:focus{border-color:var(--brand);background:#fff;
-    box-shadow:0 0 0 3px rgba(26,74,138,.12)}
-  textarea{resize:vertical;min-height:72px}
-  .field{margin-bottom:16px}
-  .field:last-child{margin-bottom:0}
-  .seg{display:flex;gap:8px;margin-bottom:12px}
-  .seg button{flex:1;padding:11px;border:1px solid var(--line);background:#fbfdff;
-    border-radius:10px;font-size:15px;font-weight:600;color:var(--muted);cursor:pointer}
-  .seg button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
-  .days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
-  .days button{padding:10px 0;border:1px solid var(--line);background:#fbfdff;
-    border-radius:9px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer}
-  .days button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
-  .days.disabled{opacity:.4;pointer-events:none}
-  .submit{width:100%;padding:15px;background:var(--brand);color:#fff;border:none;
-    border-radius:12px;font-size:17px;font-weight:700;cursor:pointer;margin-top:4px;
-    box-shadow:0 4px 14px rgba(26,74,138,.3)}
+  *{box-sizing:border-box}
+  html{color-scheme:light}  /* 強制原生控制項(日期、下拉)用亮色,不受系統深色模式影響 */
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+
+  .page{max-width:860px;margin:0 auto;padding:40px 24px 72px}
+
+  .hero{background:linear-gradient(120deg,var(--blue) 0%,#8db8e2 45%,var(--pink) 100%);
+    color:#fff;border-radius:20px;padding:34px 40px;box-shadow:var(--shadow);margin-bottom:26px}
+  .hero h1{margin:0 0 10px;font-size:27px;letter-spacing:.5px;text-wrap:balance;
+    text-shadow:0 1px 2px rgba(60,90,140,.18)}
+  .hero p{margin:0;font-size:15px;line-height:1.7;max-width:640px;color:rgba(255,255,255,.96)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;
+    padding:34px 40px;box-shadow:var(--shadow)}
+
+  .msg{padding:13px 16px;border-radius:11px;font-size:14px;line-height:1.6;margin-bottom:22px;display:none}
+  .msg.err{background:var(--danger-bg);color:var(--danger);display:block}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:22px 28px}
+  .field{display:flex;flex-direction:column}
+  .field.full{grid-column:1 / -1}
+  label{font-size:14px;font-weight:700;margin-bottom:9px;display:block;color:var(--text)}
+  .req{color:var(--pink-d);margin-left:3px}
+  .hint{font-weight:400;color:var(--muted);font-size:12.5px;margin-left:8px}
+
+  input[type=text],input[type=tel],input[type=date],select,textarea{
+    width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:11px;
+    font-size:15px;color:var(--text);background:var(--field);outline:none;transition:.15s;font-family:inherit}
+  input:focus,select:focus,textarea:focus{border-color:var(--blue);background:var(--card);
+    box-shadow:0 0 0 4px var(--blue-soft)}
+  select{appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238090a3' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 14px center;padding-right:40px}
+  textarea{resize:vertical;min-height:84px}
+
+  /* 取件頻率 */
+  .freq-everyday{display:inline-flex;align-items:center;gap:9px;margin-bottom:14px;
+    padding:9px 14px;border:1px solid var(--line);border-radius:11px;background:var(--field);
+    cursor:pointer;user-select:none;width:fit-content}
+  .freq-everyday .box{width:19px;height:19px;border-radius:6px;border:2px solid var(--faint);
+    display:grid;place-items:center;transition:.15s;color:#fff;font-size:12px}
+  .freq-everyday.on{border-color:var(--pink);background:var(--pink-soft)}
+  .freq-everyday.on .box{background:var(--pink);border-color:var(--pink)}
+  .freq-everyday .t{font-size:13px;font-weight:700}
+  .days{display:flex;gap:10px;flex-wrap:wrap}
+  .days button{min-width:64px;padding:12px 0;border:1px solid var(--line);background:var(--field);
+    border-radius:11px;font-size:15px;font-weight:700;color:var(--muted);transition:.12s}
+  .days button:hover{border-color:var(--blue)}
+  .days button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+  .noteinfo{font-size:13px;color:var(--muted);line-height:1.75;margin-top:10px;
+    padding:12px 15px;background:var(--pink-soft);border-radius:11px;border:1px dashed var(--pink)}
+
+  .submit-row{margin-top:30px}
+  .submit{padding:15px 44px;background:var(--blue);color:#fff;border:none;border-radius:12px;
+    font-size:16px;font-weight:800;box-shadow:0 6px 18px rgba(91,155,213,.35);transition:.12s}
+  .submit:hover{background:var(--blue-d)}
   .submit:active{transform:translateY(1px)}
-  .submit:disabled{opacity:.6}
-  .msg{padding:12px 14px;border-radius:10px;font-size:14px;line-height:1.6;margin-bottom:14px;display:none}
-  .msg.err{background:#fdecec;color:var(--danger);border:1px solid #f5c6c6;display:block}
-  .msg.ok{background:#e9f8f0;color:var(--ok);border:1px solid #b8e6cd;display:block}
-  .note-info{font-size:12px;color:var(--muted);line-height:1.7;margin-top:6px}
-  .done{text-align:center;padding:36px 20px}
-  .done .tick{width:64px;height:64px;border-radius:50%;background:var(--ok);color:#fff;
-    font-size:34px;line-height:64px;margin:0 auto 16px}
-  .done h2{margin:0 0 8px;font-size:20px}
-  .done p{color:var(--muted);font-size:14px;line-height:1.7}
-  .link-btn{margin-top:18px;display:inline-block;color:var(--brand);font-weight:600;
-    text-decoration:none;font-size:15px;cursor:pointer}
+  .submit:disabled{opacity:.6;cursor:default}
+
+  /* 完成畫面 */
+  .done{text-align:center;padding:20px}
+  .done .tick{width:76px;height:76px;border-radius:50%;
+    background:linear-gradient(135deg,var(--blue),var(--pink));color:#fff;font-size:40px;
+    display:grid;place-items:center;margin:0 auto 20px}
+  .done h2{margin:0 0 12px;font-size:24px}
+  .done p{color:var(--muted);font-size:15px;line-height:1.8;margin:0 auto;max-width:460px}
+  .done .again{margin-top:26px;padding:12px 26px;border:1px solid var(--line);background:var(--card);
+    color:var(--blue-d);border-radius:11px;font-size:15px;font-weight:700}
+
+  .hide{display:none!important}
+  @media (max-width:640px){
+    .page{padding:20px 14px 48px}
+    .hero{padding:24px 22px;border-radius:16px}
+    .hero h1{font-size:22px}
+    .card{padding:24px 20px;border-radius:16px}
+    .grid{grid-template-columns:1fr;gap:18px}
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
+<div class="page">
+  <div class="hero">
     <h1>固定取件設定</h1>
-    <p>填一次、長期生效。設定後,系統每天會依你的頻率自動幫你安排取件,不用每天重打單。</p>
-  </header>
-
-  <div id="formView">
-    <div id="msg" class="msg"></div>
-    <form id="form" autocomplete="on">
-      <div class="card">
-        <div class="field">
-          <label>客戶名稱<span class="req">*</span></label>
-          <input type="text" name="name" placeholder="例如:東午月創意股份有限公司" required />
-        </div>
-        <div class="field">
-          <label>取件地址<span class="req">*</span></label>
-          <input type="text" name="address" placeholder="例如:台中市西區大隆路20號" required />
-        </div>
-        <div class="field">
-          <label>固定取件時間<span class="req">*</span><span class="hint">每天大約幾點</span></label>
-          <input type="time" name="fixedTime" required />
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="field">
-          <label>聯絡電話<span class="req">*</span></label>
-          <input type="tel" name="phone" placeholder="例如:04-12345678" required />
-        </div>
-        <div class="field">
-          <label>現場聯絡人<span class="req">*</span></label>
-          <input type="text" name="contact" placeholder="例如:王小姐" required />
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="field">
-          <label>取件頻率<span class="req">*</span></label>
-          <div class="seg" id="freqSeg">
-            <button type="button" data-freq="daily">每天</button>
-            <button type="button" data-freq="weekly" class="on">每週特定星期</button>
-          </div>
-          <div class="days" id="days">
-            <button type="button" data-d="1">一</button>
-            <button type="button" data-d="2">二</button>
-            <button type="button" data-d="3">三</button>
-            <button type="button" data-d="4">四</button>
-            <button type="button" data-d="5">五</button>
-            <button type="button" data-d="6">六</button>
-            <button type="button" data-d="7">日</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>生效日期<span class="req">*</span><span class="hint">從哪天開始套用</span></label>
-          <input type="date" name="effectiveDate" required />
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="field">
-          <label>備註<span class="hint">選填</span></label>
-          <textarea name="customerNote" placeholder="特殊叮嚀,例如:12-14點午休請避開"></textarea>
-          <div class="note-info">
-            ※ 每筆單子的包裹數會先帶 0、備註帶「件數確認中」,實際件數與指派司機由本公司人員後續補上,確保單子一定會出現在取件表上,不會被遺漏。
-          </div>
-        </div>
-      </div>
-
-      <button type="submit" class="submit" id="submitBtn">送出設定</button>
-    </form>
+    <p>填一次、長期生效。設定完成後,系統每天會依你設定的取件日,自動為你安排取件,不需要每天重新下單。</p>
   </div>
 
-  <div id="doneView" class="done card" style="display:none">
+  <div id="formView" class="card">
+    <div id="fmsg" class="msg"></div>
+    <div class="grid">
+      <div class="field full">
+        <label>客戶名稱<span class="req">*</span></label>
+        <input type="text" id="f_name" placeholder="請輸入公司或店家名稱">
+      </div>
+      <div class="field full">
+        <label>取件地址<span class="req">*</span></label>
+        <input type="text" id="f_addr" placeholder="請輸入完整取件地址">
+      </div>
+
+      <div class="field">
+        <label>備貨好時間<span class="req">*</span></label>
+        <select id="f_time">
+          <option value="" disabled selected>請選擇時間</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>聯絡電話<span class="req">*</span></label>
+        <input type="tel" id="f_phone" placeholder="請輸入聯絡電話">
+      </div>
+
+      <div class="field">
+        <label>現場聯絡人<span class="req">*</span></label>
+        <input type="text" id="f_contact" placeholder="請輸入現場聯絡人姓名">
+      </div>
+      <div class="field">
+        <label>生效日期<span class="req">*</span><span class="hint">從哪天開始套用</span></label>
+        <input type="date" id="f_date">
+      </div>
+
+      <div class="field full">
+        <label>取件頻率<span class="req">*</span><span class="hint">選擇每週固定的取件日(僅平日)</span></label>
+        <div class="freq-everyday" id="everyday">
+          <span class="box" id="everydayBox"></span>
+          <span class="t">每天</span>
+        </div>
+        <div class="days" id="days">
+          <button type="button" data-d="1">週一</button>
+          <button type="button" data-d="2">週二</button>
+          <button type="button" data-d="3">週三</button>
+          <button type="button" data-d="4">週四</button>
+          <button type="button" data-d="5">週五</button>
+        </div>
+      </div>
+
+      <div class="field full">
+        <label>備註<span class="hint">選填</span></label>
+        <textarea id="f_note" placeholder="特殊叮嚀,例如:12-14 點午休請避開"></textarea>
+        <div class="noteinfo">※ 包裹數預設 0，實際件數請於出貨前一日另行通知業務。</div>
+      </div>
+    </div>
+
+    <div class="submit-row">
+      <button class="submit" id="submitBtn">送出設定</button>
+    </div>
+  </div>
+
+  <div id="doneView" class="card done hide">
     <div class="tick">✓</div>
     <h2>設定完成!</h2>
-    <p>你的固定取件已建立,系統會從生效日起,依設定的頻率每天自動幫你安排。<br/>若需請假或暫停,請聯絡本公司人員。</p>
-    <a class="link-btn" id="again">再新增一筆</a>
+    <p>你的固定取件已建立,系統會從生效日起,依你設定的取件日每天自動安排。若需請假或暫停,請聯絡本公司業務。</p>
+    <button class="again" id="again">再新增一筆</button>
   </div>
 </div>
 
 <script>
 (function(){
-  var freq = 'weekly';
   var days = new Set();
 
-  var seg = document.getElementById('freqSeg');
+  // 產生時間下拉:09:00 ~ 15:30,每 30 分鐘一格(客人只能選整點/半點,避免打出 15:29 這種)
+  var sel = document.getElementById('f_time');
+  for(var m=9*60; m<=15*60+30; m+=30){
+    var hh=String(Math.floor(m/60)).padStart(2,'0'), mm=String(m%60).padStart(2,'0');
+    var o=document.createElement('option'); o.value=hh+':'+mm; o.textContent=hh+':'+mm; sel.appendChild(o);
+  }
+
+  document.getElementById('f_date').value = new Date().toISOString().slice(0,10);
+
   var daysEl = document.getElementById('days');
+  var everyday = document.getElementById('everyday');
+  var everydayBox = document.getElementById('everydayBox');
 
-  seg.addEventListener('click', function(e){
-    var b = e.target.closest('button'); if(!b) return;
-    freq = b.dataset.freq;
-    seg.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on', x===b); });
-    daysEl.classList.toggle('disabled', freq==='daily');
-  });
-
+  function syncEveryday(){
+    var all = [1,2,3,4,5].every(function(d){ return days.has(String(d)); });
+    everyday.classList.toggle('on', all);
+    everydayBox.textContent = all ? '✓' : '';
+  }
+  function paintDays(){
+    daysEl.querySelectorAll('button').forEach(function(b){
+      b.classList.toggle('on', days.has(b.dataset.d));
+    });
+    syncEveryday();
+  }
   daysEl.addEventListener('click', function(e){
     var b = e.target.closest('button'); if(!b) return;
     var d = b.dataset.d;
     if(days.has(d)) days.delete(d); else days.add(d);
-    b.classList.toggle('on', days.has(d));
+    paintDays();
+  });
+  // 「每天」= 一鍵全選/取消 週一~週五
+  everyday.addEventListener('click', function(){
+    var all = [1,2,3,4,5].every(function(d){ return days.has(String(d)); });
+    days.clear();
+    if(!all){ ['1','2','3','4','5'].forEach(function(d){ days.add(d); }); }
+    paintDays();
   });
 
-  // 生效日期預設為今天
-  document.querySelector('[name=effectiveDate]').value = new Date().toISOString().slice(0,10);
-
-  var form = document.getElementById('form');
-  var msg = document.getElementById('msg');
+  var msg = document.getElementById('fmsg');
   var btn = document.getElementById('submitBtn');
+  function v(id){ return document.getElementById(id).value.trim(); }
+  function showErr(t){ msg.className='msg err'; msg.textContent=t; window.scrollTo({top:0,behavior:'smooth'}); }
 
-  function showMsg(type, text){
-    msg.className = 'msg ' + type;
-    msg.textContent = text;
-    window.scrollTo({top:0, behavior:'smooth'});
-  }
+  btn.addEventListener('click', async function(){
+    msg.className='msg';
+    var req=[['f_name','客戶名稱'],['f_addr','取件地址'],['f_time','備貨好時間'],
+             ['f_phone','聯絡電話'],['f_contact','現場聯絡人'],['f_date','生效日期']];
+    var miss=req.filter(function(r){ return !v(r[0]); }).map(function(r){ return r[1]; });
+    if(miss.length){ showErr('請填寫:'+miss.join('、')); return; }
+    if(days.size===0){ showErr('請至少選擇一個取件日。'); return; }
 
-  form.addEventListener('submit', async function(e){
-    e.preventDefault();
-    msg.className = 'msg';
-
-    if(freq==='weekly' && days.size===0){
-      showMsg('err','取件頻率為每週時,請至少選一個星期。');
-      return;
-    }
-
-    var fd = new FormData(form);
+    // 一律以「每週特定星期」儲存(取件日僅平日;「每天」等同週一至週五)
+    var sortedDays = Array.from(days).map(Number).sort(function(a,b){return a-b;}).join(',');
     var payload = {
-      name: fd.get('name'), address: fd.get('address'),
-      fixedTime: fd.get('fixedTime'), phone: fd.get('phone'),
-      contact: fd.get('contact'), effectiveDate: fd.get('effectiveDate'),
-      customerNote: fd.get('customerNote'),
-      frequencyType: freq,
-      weekdays: freq==='weekly' ? Array.from(days).join(',') : ''
+      name: v('f_name'), address: v('f_addr'), fixedTime: v('f_time'),
+      phone: v('f_phone'), contact: v('f_contact'), effectiveDate: v('f_date'),
+      customerNote: v('f_note'), frequencyType: 'weekly', weekdays: sortedDays
     };
 
-    btn.disabled = true; btn.textContent = '送出中…';
+    btn.disabled=true; btn.textContent='送出中…';
     try{
       var r = await fetch('/api/customers', {
         method:'POST', headers:{'Content-Type':'application/json'},
@@ -203,22 +243,20 @@
       });
       var data = await r.json();
       if(!r.ok || !data.ok){
-        showMsg('err', (data.errors ? data.errors.join('、') : data.error) || '送出失敗,請檢查欄位。');
+        showErr((data.errors ? data.errors.join('、') : data.error) || '送出失敗,請檢查欄位。');
         return;
       }
-      document.getElementById('formView').style.display='none';
-      document.getElementById('doneView').style.display='block';
+      document.getElementById('formView').classList.add('hide');
+      document.getElementById('doneView').classList.remove('hide');
       window.scrollTo({top:0});
     }catch(err){
-      showMsg('err','網路連線異常,請稍後再試。');
+      showErr('網路連線異常,請稍後再試。');
     }finally{
       btn.disabled=false; btn.textContent='送出設定';
     }
   });
 
-  document.getElementById('again').addEventListener('click', function(){
-    location.reload();
-  });
+  document.getElementById('again').addEventListener('click', function(){ location.reload(); });
 })();
 </script>
 </body>

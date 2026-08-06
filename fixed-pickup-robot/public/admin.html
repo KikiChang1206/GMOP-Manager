@@ -2,71 +2,109 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8" />
+<title>固定取件管理（後台）｜GoodMaji</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>固定取件管理｜GoodMaji</title>
-<meta name="theme-color" content="#1A4A8A" />
+<meta name="theme-color" content="#7FB2E6" />
 <style>
-  :root{--brand:#1A4A8A;--bg:#F0F4FA;--line:#dbe3ef;--text:#1f2a3a;--muted:#6b7891;
-    --ok:#1f9d63;--danger:#d64545;--warn:#c98a00}
+  :root{
+    --blue:#5B9BD5; --blue-d:#4C8DD6; --blue-soft:#eaf2fb;
+    --pink:#EC8FB8; --pink-d:#e57aa9; --pink-soft:#fdeef4;
+    --bg:#f5f8fc; --card:#ffffff; --field:#f7fafd; --line:#e5ecf5;
+    --text:#3f4a5c; --muted:#8090a3; --faint:#aab4c4;
+    --ok:#2fa06f; --ok-bg:#e6f6ef; --miss:#e0637f; --miss-bg:#fdeef1;
+    --paused:#8494a8; --paused-bg:#eef2f7;
+    --shadow:0 10px 30px rgba(90,130,190,.12);
+  }
+  html{color-scheme:light}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
-    font-family:-apple-system,"PingFang TC","Noto Sans TC",system-ui,sans-serif}
-  header{background:var(--brand);color:#fff;padding:16px 20px;display:flex;
-    align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
-  header h1{margin:0;font-size:18px}
-  .tabs{display:flex;gap:8px}
-  .tabs button{padding:7px 14px;border:1px solid rgba(255,255,255,.5);background:transparent;
-    color:#fff;border-radius:8px;font-size:14px;cursor:pointer}
-  .tabs button.on{background:#fff;color:var(--brand);font-weight:700}
-  .wrap{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
-  .gate{max-width:340px;margin:80px auto;background:#fff;border:1px solid var(--line);
-    border-radius:14px;padding:24px;text-align:center}
-  .gate input{width:100%;padding:11px;border:1px solid var(--line);border-radius:9px;
-    font-size:16px;margin:14px 0}
-  .gate button,.reload{background:var(--brand);color:#fff;border:none;padding:11px 18px;
-    border-radius:9px;font-size:15px;font-weight:600;cursor:pointer}
-  table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;
-    box-shadow:0 1px 4px rgba(0,0,0,.05);font-size:13px}
-  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
-  th{background:#eef3fb;font-size:12px;color:var(--muted)}
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+
+  /* 登入閘門 */
+  .gate{max-width:360px;margin:90px auto;background:var(--card);border:1px solid var(--line);
+    border-radius:18px;padding:30px 28px;text-align:center;box-shadow:var(--shadow)}
+  .gate h1{color:var(--blue-d);margin:0 0 4px;font-size:20px}
+  .gate p{color:var(--muted);font-size:13px;margin:0 0 18px}
+  .gate input{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:11px;
+    font-size:16px;margin-bottom:14px;background:var(--field);color:var(--text)}
+  .gate button{width:100%;background:var(--blue);color:#fff;border:none;padding:12px;border-radius:11px;
+    font-size:15px;font-weight:700}
+  .gate .err{color:var(--miss);font-size:13px;margin-top:10px;min-height:18px}
+
+  .topbar{background:linear-gradient(120deg,var(--blue),#8db8e2 55%,var(--pink));
+    color:#fff;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .topbar h1{margin:0;font-size:19px;letter-spacing:.5px}
+  .topbar .reload{background:rgba(255,255,255,.22);color:#fff;border:1px solid rgba(255,255,255,.5);
+    padding:8px 15px;border-radius:9px;font-size:13px;font-weight:700}
+
+  .wrap{max-width:1120px;margin:0 auto;padding:24px 20px 60px}
+
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}
+  .stat .k{font-size:12.5px;color:var(--muted);font-weight:600}
+  .stat .v{font-size:28px;font-weight:800;margin-top:5px;font-variant-numeric:tabular-nums}
+  .stat .v.ok{color:var(--ok)} .stat .v.miss{color:var(--miss)} .stat .v.blue{color:var(--blue-d)}
+
+  .tabs{display:inline-flex;gap:6px;background:#e8eef7;border-radius:11px;padding:5px;margin-bottom:16px}
+  .tabs button{border:none;background:transparent;color:var(--muted);font-weight:700;font-size:14px;
+    padding:9px 18px;border-radius:8px;transition:.12s}
+  .tabs button.on{background:var(--card);color:var(--blue-d);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+  .scrollx{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:820px}
+  th,td{padding:13px 16px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{background:#f0f5fb;font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.3px}
   tr:last-child td{border-bottom:none}
-  .pill{padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600}
-  .pill.active{background:#e9f8f0;color:var(--ok)}
-  .pill.paused{background:#f1f1f4;color:var(--muted)}
-  .pill.ok{background:#e9f8f0;color:var(--ok)}
-  .pill.fail{background:#fdecec;color:var(--danger)}
-  .act{padding:5px 11px;border:1px solid var(--line);background:#fff;border-radius:7px;
-    font-size:12px;cursor:pointer;color:var(--brand);font-weight:600}
-  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px}
-  .count{color:var(--muted);font-size:13px}
-  .scroll{overflow-x:auto}
-  .empty{text-align:center;color:var(--muted);padding:40px;background:#fff;border-radius:12px}
-  .err{color:var(--danger);font-size:14px;margin-top:8px}
+  td .name{font-weight:700}
+  td .sub{color:var(--muted);font-size:12px;margin-top:2px}
+  .pill{display:inline-block;padding:3px 11px;border-radius:20px;font-size:12px;font-weight:700}
+  .pill.active{background:var(--ok-bg);color:var(--ok)}
+  .pill.paused{background:var(--paused-bg);color:var(--paused)}
+  .pill.ok{background:var(--ok-bg);color:var(--ok)}
+  .pill.miss{background:var(--miss-bg);color:var(--miss)}
+  .pill.due{background:var(--blue-soft);color:var(--blue-d);margin-left:8px}
+  .rowbtn{border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:12.5px;font-weight:700;
+    padding:6px 13px;color:var(--blue-d);transition:.12s}
+  .rowbtn:hover{border-color:var(--blue)}
+  .rowbtn.on{color:var(--paused)}
+  .empty{text-align:center;color:var(--muted);padding:46px 20px}
+  .foot{padding:12px 16px;color:var(--muted);font-size:12px;background:var(--field)}
+  .hide{display:none!important}
+  @media (max-width:760px){ .cards{grid-template-columns:repeat(2,1fr)} }
 </style>
 </head>
 <body>
 
 <div id="gate" class="gate">
-  <h1 style="color:var(--brand);margin:0">管理者登入</h1>
-  <input type="password" id="pw" placeholder="請輸入管理密碼" />
+  <h1>固定取件管理</h1>
+  <p>後台 · 請輸入管理密碼</p>
+  <input type="password" id="pw" placeholder="管理密碼" />
   <button onclick="login()">進入</button>
   <div id="gateErr" class="err"></div>
 </div>
 
-<div id="app" style="display:none">
-  <header>
-    <h1>固定取件管理</h1>
+<div id="app" class="hide">
+  <div class="topbar">
+    <h1>固定取件管理 · 後台</h1>
+    <button class="reload" onclick="refresh()">重新整理</button>
+  </div>
+  <div class="wrap">
+    <div class="cards">
+      <div class="stat"><div class="k">客人總數</div><div class="v" id="s_total">–</div></div>
+      <div class="stat"><div class="k">今天要排</div><div class="v blue" id="s_due">–</div></div>
+      <div class="stat"><div class="k">今日成功</div><div class="v ok" id="s_ok">–</div></div>
+      <div class="stat"><div class="k">今日缺漏</div><div class="v miss" id="s_miss">–</div></div>
+    </div>
     <div class="tabs">
-      <button id="tabC" class="on" onclick="show('customers')">客人設定</button>
+      <button id="tabC" class="on" onclick="show('customers')">客人設定紀錄</button>
       <button id="tabL" onclick="show('logs')">執行記錄</button>
     </div>
-  </header>
-  <div class="wrap">
-    <div class="toolbar">
-      <span class="count" id="count"></span>
-      <button class="reload" onclick="refresh()">重新整理</button>
+    <div class="panel"><div class="scrollx"><div id="content"></div></div>
+      <div class="foot" id="foot"></div>
     </div>
-    <div class="scroll"><div id="content"></div></div>
   </div>
 </div>
 
@@ -74,99 +112,91 @@
 var PW='', view='customers';
 var WD=['','週一','週二','週三','週四','週五','週六','週日'];
 
+function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function isoWeekday(d){return ((d.getDay()+6)%7)+1;}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m];});}
+
 function login(){
-  PW = document.getElementById('pw').value;
+  PW=document.getElementById('pw').value;
   api('/api/admin/customers').then(function(){
-    document.getElementById('gate').style.display='none';
-    document.getElementById('app').style.display='block';
+    document.getElementById('gate').classList.add('hide');
+    document.getElementById('app').classList.remove('hide');
     refresh();
-  }).catch(function(){
-    document.getElementById('gateErr').textContent='密碼錯誤';
-  });
+  }).catch(function(){ document.getElementById('gateErr').textContent='密碼錯誤'; });
 }
-
-function api(path, opts){
-  opts = opts || {};
-  opts.headers = Object.assign({'x-admin-password':PW,'Content-Type':'application/json'}, opts.headers||{});
-  return fetch(path, opts).then(function(r){
-    if(!r.ok) throw new Error('unauthorized');
-    return r.json();
-  });
+function api(path,opts){
+  opts=opts||{};
+  opts.headers=Object.assign({'x-admin-password':PW,'Content-Type':'application/json'},opts.headers||{});
+  return fetch(path,opts).then(function(r){ if(!r.ok) throw new Error('unauthorized'); return r.json(); });
 }
-
 function show(v){
   view=v;
-  document.getElementById('tabC').classList.toggle('on', v==='customers');
-  document.getElementById('tabL').classList.toggle('on', v==='logs');
+  document.getElementById('tabC').classList.toggle('on',v==='customers');
+  document.getElementById('tabL').classList.toggle('on',v==='logs');
   refresh();
 }
+function refresh(){ view==='customers'?loadCustomers():loadLogs(); }
 
+// 取件日文字:全平日顯示「每天(週一~五)」,否則列出星期
 function freqText(c){
+  var ds=(c.weekdays||'').split(',').filter(Boolean).map(Number).sort(function(a,b){return a-b;});
   if(c.frequencyType==='daily') return '每天';
-  return '每週 ' + (c.weekdays||'').split(',').filter(Boolean)
-    .map(function(d){return WD[+d];}).join('、');
+  if(ds.length===0) return '—';
+  if(ds.join(',')==='1,2,3,4,5') return '每天(週一~五)';
+  return ds.map(function(d){return WD[d];}).join('、');
 }
-
-function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(m){
-  return {'&':'&amp;','<':'&lt;','>':'&gt;'}[m]; }); }
-
-function refresh(){
-  if(view==='customers') loadCustomers(); else loadLogs();
+function isDue(c){
+  if(c.status!=='active') return false;
+  if(c.effectiveDate && todayStr()<c.effectiveDate) return false;
+  if(c.frequencyType==='daily') return true;
+  return (c.weekdays||'').split(',').map(Number).includes(isoWeekday(new Date()));
 }
 
 function loadCustomers(){
   api('/api/admin/customers').then(function(d){
-    var list = d.customers||[];
-    document.getElementById('count').textContent = '共 '+list.length+' 位客人';
-    if(!list.length){ document.getElementById('content').innerHTML='<div class="empty">尚無資料</div>'; return; }
-    var rows = list.map(function(c){
-      var st = c.status==='active';
-      return '<tr>'
-        +'<td>'+esc(c.name)+'</td>'
-        +'<td>'+esc(c.address)+'</td>'
-        +'<td>'+esc(c.fixedTime)+'</td>'
-        +'<td>'+esc(freqText(c))+'</td>'
-        +'<td>'+esc(c.effectiveDate)+'</td>'
-        +'<td>'+esc(c.contact)+'<br><span style="color:var(--muted)">'+esc(c.phone)+'</span></td>'
-        +'<td>'+esc(c.customerNote||'-')+'</td>'
-        +'<td><span class="pill '+(st?'active':'paused')+'">'+(st?'啟用':'暫停')+'</span></td>'
-        +'<td><button class="act" onclick="toggle(\''+c.customer_id+'\',\''+(st?'paused':'active')+'\')">'
-          +(st?'暫停':'啟用')+'</button></td>'
-        +'</tr>';
+    var list=d.customers||[];
+    document.getElementById('s_total').textContent=list.length;
+    document.getElementById('s_due').textContent=list.filter(isDue).length;
+    if(!list.length){ document.getElementById('content').innerHTML='<div class="empty">尚無客人設定</div>'; document.getElementById('foot').textContent=''; return; }
+    var rows=list.map(function(c){
+      var st=c.status==='active';
+      return '<tr>'+
+        '<td><div class="name">'+esc(c.name)+(isDue(c)?'<span class="pill due">今天要排</span>':'')+'</div><div class="sub">'+esc(c.address)+'</div></td>'+
+        '<td>'+esc(c.fixedTime)+'</td>'+
+        '<td>'+esc(freqText(c))+'</td>'+
+        '<td><div>'+esc(c.contact)+'</div><div class="sub">'+esc(c.phone)+'</div></td>'+
+        '<td>'+esc(c.customerNote||'—')+'</td>'+
+        '<td><span class="pill '+(st?'active':'paused')+'">'+(st?'啟用':'暫停')+'</span></td>'+
+        '<td style="text-align:right"><button class="rowbtn'+(st?'':' on')+'" onclick="toggle(\''+c.customer_id+'\',\''+(st?'paused':'active')+'\')">'+(st?'暫停':'啟用')+'</button></td>'+
+      '</tr>';
     }).join('');
-    document.getElementById('content').innerHTML =
-      '<table><thead><tr><th>客戶</th><th>地址</th><th>時間</th><th>頻率</th><th>生效日</th>'
-      +'<th>聯絡</th><th>備註</th><th>狀態</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+    document.getElementById('content').innerHTML=
+      '<table><thead><tr><th>客戶 / 地址</th><th>備貨好時間</th><th>取件日</th><th>聯絡</th><th>備註</th><th>狀態</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+    document.getElementById('foot').textContent='共 '+list.length+' 位客人　·　可隨時按「暫停」讓某位客人先不排(例如請假、歇業),需要時再「啟用」';
   });
 }
-
 function loadLogs(){
   api('/api/admin/logs').then(function(d){
-    var list = d.logs||[];
-    document.getElementById('count').textContent = '最近 '+list.length+' 筆執行記錄';
-    if(!list.length){ document.getElementById('content').innerHTML='<div class="empty">尚無執行記錄</div>'; return; }
-    var rows = list.map(function(l){
-      var ok = l.result==='成功';
-      return '<tr>'
-        +'<td>'+esc(l.runDate)+'</td>'
-        +'<td>'+esc(l.name)+'</td>'
-        +'<td><span class="pill '+(ok?'ok':'fail')+'">'+esc(l.result)+'</span></td>'
-        +'<td>'+esc(l.errorReason||'-')+'</td>'
-        +'<td style="color:var(--muted)">'+esc((l.timestamp||'').replace('T',' ').slice(0,19))+'</td>'
-        +'</tr>';
+    var list=d.logs||[];
+    var today=todayStr();
+    document.getElementById('s_ok').textContent=list.filter(function(l){return l.runDate===today&&l.result==='成功';}).length||0;
+    document.getElementById('s_miss').textContent=list.filter(function(l){return l.runDate===today&&l.result!=='成功';}).length||0;
+    if(!list.length){ document.getElementById('content').innerHTML='<div class="empty">尚無執行記錄</div>'; document.getElementById('foot').textContent=''; return; }
+    var rows=list.map(function(l){
+      var ok=l.result==='成功';
+      return '<tr><td>'+esc(l.runDate)+'</td><td><div class="name">'+esc(l.name)+'</div></td>'+
+        '<td><span class="pill '+(ok?'ok':'miss')+'">'+(ok?'成功':'缺漏')+'</span></td>'+
+        '<td>'+esc(l.errorReason||'—')+'</td><td class="sub">'+esc((l.timestamp||'').replace('T',' ').slice(11,19))+'</td></tr>';
     }).join('');
-    document.getElementById('content').innerHTML =
-      '<table><thead><tr><th>執行日期</th><th>客戶</th><th>結果</th><th>失敗原因</th><th>時間戳記</th></tr></thead><tbody>'
-      +rows+'</tbody></table>';
+    document.getElementById('content').innerHTML=
+      '<table><thead><tr><th>執行日期</th><th>客戶</th><th>結果</th><th>說明</th><th>執行時間</th></tr></thead><tbody>'+rows+'</tbody></table>';
+    document.getElementById('foot').textContent='每天機器人跑完會自動寫入一筆　·　缺漏的會標「待人工補單」,並同步發通知提醒你';
   });
 }
-
-function toggle(id, status){
-  api('/api/admin/status', {method:'POST', body: JSON.stringify({customer_id:id, status:status})})
-    .then(function(){ loadCustomers(); });
+function toggle(id,status){
+  api('/api/admin/status',{method:'POST',body:JSON.stringify({customer_id:id,status:status})}).then(loadCustomers);
 }
-
-document.getElementById('pw').addEventListener('keydown', function(e){ if(e.key==='Enter') login(); });
+document.getElementById('pw').addEventListener('keydown',function(e){ if(e.key==='Enter') login(); });
 </script>
 </body>
 </html>
