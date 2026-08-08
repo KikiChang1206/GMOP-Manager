@@ -2534,7 +2534,8 @@ function MyCasesTab({
   onUndo,
   onEmptyTrip,
   onReorder,
-  onSession
+  onSession,
+  onPreAdd
 }) {
   const [section, setSection] = useState(0);
   const [sortMode, setSortMode] = useState(false);
@@ -2634,7 +2635,21 @@ function MyCasesTab({
     style: {
       padding: "14px 12px 80px"
     }
-  }, section === 1 && cur.cases.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, onPreAdd && /*#__PURE__*/React.createElement("button", {
+    onClick: onPreAdd,
+    style: {
+      width: "100%",
+      marginBottom: 12,
+      background: C.white,
+      border: `1.5px dashed ${C.blue}`,
+      borderRadius: 12,
+      padding: "11px",
+      color: C.blue,
+      fontSize: 13,
+      fontWeight: 800,
+      cursor: "pointer"
+    }
+  }, "➕ 加收 PRE 件數（另計）"), section === 1 && cur.cases.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -3621,6 +3636,184 @@ function TripEndModal({
     }
   }, "取消")));
 }
+// ── PRE 加收（現場另計 PRE 件數，獨立產生一筆 PRE 案件）──────
+function PreAddModal({
+  myCases,
+  onClose,
+  onSubmit
+}) {
+  const activeCases = (myCases || []).filter(c => !c.is_pre);
+  const [sourceId, setSourceId] = useState(activeCases[0] ? activeCases[0].id : "manual");
+  const [manualName, setManualName] = useState("");
+  const [manualAddr, setManualAddr] = useState("");
+  const [code, setCode] = useState("PRE");
+  const [pcs, setPcs] = useState("");
+  const [remark, setRemark] = useState("");
+  const src = activeCases.find(c => c.id === sourceId);
+  const canSubmit = (sourceId === "manual" ? manualName.trim() !== "" : !!src) && Number(pcs) > 0;
+  const lbl = {
+    fontSize: 12,
+    color: C.textSub,
+    fontWeight: 600,
+    marginBottom: 6,
+    marginTop: 12
+  };
+  const inp = {
+    width: "100%",
+    background: C.grayLight,
+    border: `1.5px solid ${C.grayBorder}`,
+    borderRadius: 12,
+    padding: "12px 14px",
+    color: C.text,
+    fontSize: 15,
+    boxSizing: "border-box",
+    outline: "none",
+    fontFamily: "inherit"
+  };
+  const submit = () => {
+    if (!canSubmit) return;
+    onSubmit({
+      source: sourceId === "manual" ? manualName.trim() : src.customer,
+      address: sourceId === "manual" ? manualAddr.trim() : src.address,
+      phone: sourceId === "manual" ? "" : src.phone || "",
+      code: code.trim() || "PRE",
+      pcs: Number(pcs),
+      remark: remark.trim()
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(20,40,80,0.5)",
+      zIndex: 200,
+      display: "flex",
+      alignItems: "flex-end"
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.white,
+      borderRadius: "22px 22px 0 0",
+      width: "100%",
+      padding: "20px 20px 44px",
+      maxHeight: "92vh",
+      overflowY: "auto"
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 40,
+      height: 5,
+      background: C.grayBorder,
+      borderRadius: 3,
+      margin: "0 auto 16px"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 16,
+      color: C.text,
+      marginBottom: 4
+    }
+  }, "➕ 加收 PRE 件數（另計）"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.textSub,
+      marginBottom: 8
+    }
+  }, "會獨立產生一筆 PRE 案件，方便與 PRE 對帳"), /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "來源客戶（在哪一家收到的）"), /*#__PURE__*/React.createElement("select", {
+    value: sourceId,
+    onChange: e => setSourceId(e.target.value),
+    style: inp
+  }, activeCases.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c.id,
+    value: c.id
+  }, `${c.customer}・${c.name}`)), /*#__PURE__*/React.createElement("option", {
+    value: "manual"
+  }, "其他（自行輸入）")), sourceId === "manual" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "來源客戶名稱"), /*#__PURE__*/React.createElement("input", {
+    value: manualName,
+    onChange: e => setManualName(e.target.value),
+    placeholder: "例如：恩碩有限公司",
+    style: inp
+  }), /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "地址（可留空）"), /*#__PURE__*/React.createElement("input", {
+    value: manualAddr,
+    onChange: e => setManualAddr(e.target.value),
+    placeholder: "取件地址",
+    style: inp
+  })), /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "PRE 代號"), /*#__PURE__*/React.createElement("input", {
+    value: code,
+    onChange: e => setCode(e.target.value),
+    placeholder: "PRE",
+    style: inp
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.textSub,
+      marginTop: 4
+    }
+  }, "代號很多時先用預設「PRE」，之後可改成真正代號"), /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "PRE 件數"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    inputMode: "numeric",
+    min: "1",
+    value: pcs,
+    onChange: e => {
+      const v = e.target.value;
+      setPcs(v === "" ? "" : Math.max(0, parseInt(v, 10) || 0));
+    },
+    placeholder: "這批屬於 PRE 的件數",
+    style: inp
+  }), /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "備註（可留空）"), /*#__PURE__*/React.createElement("textarea", {
+    value: remark,
+    onChange: e => setRemark(e.target.value),
+    rows: 2,
+    placeholder: "補充說明",
+    style: { ...inp,
+      resize: "none"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    disabled: !canSubmit,
+    style: {
+      width: "100%",
+      marginTop: 18,
+      background: canSubmit ? `linear-gradient(135deg,${C.green},#27855A)` : C.grayBorder,
+      border: "none",
+      borderRadius: 14,
+      padding: 15,
+      color: C.white,
+      fontSize: 16,
+      fontWeight: 800,
+      cursor: canSubmit ? "pointer" : "default"
+    }
+  }, "✅ 新增 PRE 案件"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      width: "100%",
+      marginTop: 10,
+      background: "transparent",
+      border: `1.5px solid ${C.grayBorder}`,
+      borderRadius: 14,
+      padding: 13,
+      color: C.textSub,
+      fontSize: 14,
+      cursor: "pointer"
+    }
+  }, "取消")));
+}
+
 function MainApp({
   me,
   meName,
@@ -3642,6 +3835,7 @@ function MainApp({
   const [pickupModal, setPickupModal] = useState(null);
   const [rejectModal, setRejectModal] = useState(null);
   const [emptyTripModal, setEmptyTripModal] = useState(null);
+  const [preAddModal, setPreAddModal] = useState(false);
   const [assignTarget, setAssignTarget] = useState(null);
   const [tripEndModal, setTripEndModal] = useState(false);
   const tripReport = myTrip.report || null;
@@ -3696,6 +3890,41 @@ function MainApp({
     status: "待取件",
     pickup_at: null
   } : c));
+  const handlePreAdd = ({
+    source,
+    address,
+    phone,
+    code,
+    pcs,
+    remark
+  }) => {
+    const id = "PRE-" + Date.now().toString().slice(-6);
+    setCases(cs => [...cs, {
+      id,
+      status: "已取件",
+      driver_id: me,
+      customer: "PRE",
+      pre_code: code || "PRE",
+      is_pre: true,
+      source_customer: source || "",
+      name: source || "",
+      address: address || "",
+      phone: phone || "",
+      pickup_time: nowStr(),
+      pcs: pcs,
+      cancel_pcs: 0,
+      pcs_actual: pcs,
+      remark: remark || "",
+      assigned_at: nowStr(),
+      pickup_at: nowStr(),
+      order: 999,
+      wait_min: 0,
+      session: null,
+      sig_url: null,
+      photo_url: null
+    }]);
+    setPreAddModal(false);
+  };
   const handleCancelPickup = (id, note) => {
     setCases(cs => cs.map(c => c.id === id ? {
       ...c,
@@ -3997,7 +4226,8 @@ function MainApp({
     onUndo: handleUndo,
     onEmptyTrip: id => setEmptyTripModal(id),
     onReorder: handleReorder,
-    onSession: handleSession
+    onSession: handleSession,
+    onPreAdd: () => setPreAddModal(true)
   }), isCaptain && tab === 1 && /*#__PURE__*/React.createElement(TeamTab, {
     cases: cases,
     me: me,
@@ -4113,6 +4343,10 @@ function MainApp({
       }));
       setDepartModal(false);
     }
+  }), preAddModal && /*#__PURE__*/React.createElement(PreAddModal, {
+    myCases: cases.filter(c => c.driver_id === me),
+    onClose: () => setPreAddModal(false),
+    onSubmit: handlePreAdd
   }));
 }
 
