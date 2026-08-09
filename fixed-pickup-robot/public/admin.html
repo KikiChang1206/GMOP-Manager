@@ -79,6 +79,41 @@
   .delbtn:disabled{opacity:.4;cursor:default;border-color:var(--line);color:var(--muted)}
   td.chk,th.chk{width:40px;text-align:center}
   input[type=checkbox]{width:17px;height:17px;accent-color:var(--blue);cursor:pointer}
+  /* 後台新增表單 */
+  .addform{padding:26px 28px}
+  .addmsg{padding:11px 14px;border-radius:10px;font-size:13.5px;margin-bottom:16px;display:none}
+  .addmsg.err{background:var(--miss-bg);color:var(--miss);display:block}
+  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px 22px}
+  .fld{display:flex;flex-direction:column}
+  .fld.full{grid-column:1/-1}
+  .fld label{font-size:13.5px;font-weight:700;margin-bottom:7px}
+  .req{color:var(--miss);margin-left:2px}
+  .hint{font-weight:400;color:var(--muted);font-size:12px}
+  .addform input[type=text],.addform input[type=tel],.addform input[type=date],.addform select,.addform textarea{
+    width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-size:15px;
+    background:var(--field);color:var(--text);outline:none;font-family:inherit}
+  .addform input:focus,.addform select:focus,.addform textarea:focus{
+    border-color:var(--blue);background:var(--card);box-shadow:0 0 0 3px var(--blue-soft)}
+  .addform select{appearance:none;-webkit-appearance:none;padding-right:38px;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238090a3' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 13px center}
+  .addform textarea{min-height:70px;resize:vertical}
+  .everyday{display:inline-flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 13px;
+    border:1px solid var(--line);border-radius:10px;background:var(--field);cursor:pointer;
+    width:fit-content;font-weight:700;font-size:13px;user-select:none}
+  .everyday .ebox{width:18px;height:18px;border-radius:5px;border:2px solid var(--faint);
+    display:grid;place-items:center;color:#fff;font-size:11px}
+  .everyday.on{border-color:var(--pink);background:var(--pink-soft)}
+  .everyday.on .ebox{background:var(--pink);border-color:var(--pink)}
+  .days{display:flex;gap:9px;flex-wrap:wrap}
+  .days button{min-width:60px;padding:11px 0;border:1px solid var(--line);background:var(--field);
+    border-radius:10px;font-weight:700;color:var(--muted);font-size:14px}
+  .days button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .addbtn{margin-top:22px;padding:13px 36px;background:var(--blue);color:#fff;border:none;
+    border-radius:11px;font-size:15px;font-weight:800}
+  .addbtn:hover{background:var(--blue-d)}
+  .addbtn:disabled{opacity:.6;cursor:default}
+  @media (max-width:640px){ .fgrid{grid-template-columns:1fr} }
   .empty{text-align:center;color:var(--muted);padding:46px 20px}
   .foot{padding:12px 16px;color:var(--muted);font-size:12px;background:var(--field)}
   .hide{display:none!important}
@@ -110,13 +145,38 @@
     <div class="tabs">
       <button id="tabC" class="on" onclick="show('customers')">客人設定紀錄</button>
       <button id="tabL" onclick="show('logs')">執行記錄</button>
+      <button id="tabA" onclick="show('add')">＋ 新增設定</button>
     </div>
     <div class="bulkbar hide" id="bulkbar">
       <span id="selCount" class="selcount">已選 0 筆</span>
       <button class="delbtn" id="delBtn" onclick="deleteSelected()" disabled>刪除選取</button>
     </div>
-    <div class="panel"><div class="scrollx"><div id="content"></div></div>
+    <div class="panel" id="panelMain"><div class="scrollx"><div id="content"></div></div>
       <div class="foot" id="foot"></div>
+    </div>
+    <div class="panel addform hide" id="panelAdd">
+      <div id="addMsg" class="addmsg"></div>
+      <div class="fgrid">
+        <div class="fld full"><label>客戶名稱<span class="req">*</span></label><input type="text" id="a_name" placeholder="請輸入公司或店家名稱"></div>
+        <div class="fld full"><label>取件地址<span class="req">*</span></label><input type="text" id="a_addr" placeholder="請輸入完整取件地址"></div>
+        <div class="fld"><label>備貨好時間<span class="req">*</span></label><select id="a_time"><option value="" disabled selected>請選擇時間</option></select></div>
+        <div class="fld"><label>聯絡電話<span class="req">*</span></label><input type="tel" id="a_phone" placeholder="請輸入聯絡電話"></div>
+        <div class="fld"><label>現場聯絡人<span class="req">*</span></label><input type="text" id="a_contact" placeholder="請輸入現場聯絡人姓名"></div>
+        <div class="fld"><label>生效日期<span class="req">*</span></label><input type="date" id="a_date"></div>
+        <div class="fld full">
+          <label>取件頻率<span class="req">*</span> <span class="hint">僅平日</span></label>
+          <div class="everyday" id="a_everyday"><span class="ebox" id="a_ebox"></span><span>每天</span></div>
+          <div class="days" id="a_days">
+            <button type="button" data-d="1">週一</button>
+            <button type="button" data-d="2">週二</button>
+            <button type="button" data-d="3">週三</button>
+            <button type="button" data-d="4">週四</button>
+            <button type="button" data-d="5">週五</button>
+          </div>
+        </div>
+        <div class="fld full"><label>備註 <span class="hint">選填</span></label><textarea id="a_note" placeholder="特殊叮嚀,例如:12-14 點午休請避開"></textarea></div>
+      </div>
+      <button class="addbtn" id="a_submit" onclick="addSubmit()">新增設定</button>
     </div>
   </div>
 </div>
@@ -134,6 +194,7 @@ function login(){
   api('/api/admin/customers').then(function(){
     document.getElementById('gate').classList.add('hide');
     document.getElementById('app').classList.remove('hide');
+    setupAddForm();
     refresh();
   }).catch(function(){ document.getElementById('gateErr').textContent='密碼錯誤'; });
 }
@@ -146,9 +207,54 @@ function show(v){
   view=v;
   document.getElementById('tabC').classList.toggle('on',v==='customers');
   document.getElementById('tabL').classList.toggle('on',v==='logs');
-  refresh();
+  document.getElementById('tabA').classList.toggle('on',v==='add');
+  var isAdd = v==='add';
+  document.getElementById('panelMain').classList.toggle('hide', isAdd);
+  document.getElementById('panelAdd').classList.toggle('hide', !isAdd);
+  if(isAdd){ document.getElementById('bulkbar').classList.add('hide'); }
+  else { refresh(); }
 }
 function refresh(){ view==='customers'?loadCustomers():loadLogs(); }
+
+// ---- 後台新增表單 ----
+var addDays=new Set(), addReady=false;
+function setupAddForm(){
+  if(addReady) return; addReady=true;
+  var sel=document.getElementById('a_time');
+  for(var m=9*60;m<=15*60+30;m+=30){
+    var hh=String(Math.floor(m/60)).padStart(2,'0'), mm=String(m%60).padStart(2,'0');
+    var o=document.createElement('option'); o.value=hh+':'+mm; o.textContent=hh+':'+mm; sel.appendChild(o);
+  }
+  document.getElementById('a_date').value=todayStr();
+  var daysEl=document.getElementById('a_days'), ev=document.getElementById('a_everyday'), ebox=document.getElementById('a_ebox');
+  function sync(){ var all=[1,2,3,4,5].every(function(d){return addDays.has(String(d));}); ev.classList.toggle('on',all); ebox.textContent=all?'✓':''; }
+  function paint(){ daysEl.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on',addDays.has(b.dataset.d)); }); sync(); }
+  daysEl.addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b)return; var d=b.dataset.d; if(addDays.has(d))addDays.delete(d);else addDays.add(d); paint(); });
+  ev.addEventListener('click',function(){ var all=[1,2,3,4,5].every(function(d){return addDays.has(String(d));}); addDays.clear(); if(!all)['1','2','3','4','5'].forEach(function(d){addDays.add(d);}); paint(); });
+}
+function addSubmit(){
+  var m=document.getElementById('addMsg'); m.className='addmsg';
+  function val(id){ return document.getElementById(id).value.trim(); }
+  var req=[['a_name','客戶名稱'],['a_addr','取件地址'],['a_time','備貨好時間'],['a_phone','聯絡電話'],['a_contact','現場聯絡人'],['a_date','生效日期']];
+  var miss=req.filter(function(r){ return !val(r[0]); }).map(function(r){ return r[1]; });
+  if(miss.length){ m.className='addmsg err'; m.textContent='請填寫:'+miss.join('、'); return; }
+  if(addDays.size===0){ m.className='addmsg err'; m.textContent='請至少選擇一個取件日。'; return; }
+  var payload={ name:val('a_name'), address:val('a_addr'), fixedTime:val('a_time'), phone:val('a_phone'),
+    contact:val('a_contact'), effectiveDate:val('a_date'), customerNote:val('a_note'),
+    frequencyType:'weekly', weekdays:Array.from(addDays).map(Number).sort(function(a,b){return a-b;}).join(',') };
+  var btn=document.getElementById('a_submit'); btn.disabled=true; btn.textContent='新增中…';
+  function done(){ btn.disabled=false; btn.textContent='新增設定'; }
+  api('/api/customers',{method:'POST',body:JSON.stringify(payload)}).then(function(){
+    ['a_name','a_addr','a_phone','a_contact','a_note'].forEach(function(id){ document.getElementById(id).value=''; });
+    document.getElementById('a_time').selectedIndex=0; document.getElementById('a_date').value=todayStr();
+    addDays.clear();
+    document.querySelectorAll('#a_days button').forEach(function(b){ b.classList.remove('on'); });
+    document.getElementById('a_everyday').classList.remove('on'); document.getElementById('a_ebox').textContent='';
+    done();
+    alert('新增成功!已加入客人設定。');
+    show('customers');
+  }).catch(function(){ done(); m.className='addmsg err'; m.textContent='新增失敗,請確認欄位或重新登入後再試。'; });
+}
 
 // 取件日文字:全平日顯示「每天(週一~五)」,否則列出星期
 function freqText(c){
