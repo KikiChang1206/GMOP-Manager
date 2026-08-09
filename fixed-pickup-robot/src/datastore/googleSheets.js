@@ -96,6 +96,39 @@ export class GoogleSheetsStore {
     });
   }
 
+  // 取得分頁的數字 sheetId(刪列時需要)
+  async #tabId(title) {
+    const meta = await this.sheets.spreadsheets.get({ spreadsheetId: this.sheetId });
+    const sheet = (meta.data.sheets || []).find((s) => s.properties.title === title);
+    if (!sheet) throw new Error(`找不到分頁:${title}`);
+    return sheet.properties.sheetId;
+  }
+
+  // 刪除一筆或多筆客人設定(依 customer_id),回傳實際刪除筆數
+  async deleteCustomers(customerIds) {
+    const ids = new Set(customerIds || []);
+    const rows = await this.#read(this.customersTab);
+    // 找出要刪的列(跳過表頭 i=0);由下往上刪,避免索引位移
+    const targets = [];
+    for (let i = 1; i < rows.length; i++) {
+      if (ids.has(rows[i][0])) targets.push(i);
+    }
+    if (targets.length === 0) return 0;
+    const tabId = await this.#tabId(this.customersTab);
+    const requests = targets
+      .sort((a, b) => b - a)
+      .map((i) => ({
+        deleteDimension: {
+          range: { sheetId: tabId, dimension: 'ROWS', startIndex: i, endIndex: i + 1 },
+        },
+      }));
+    await this.sheets.spreadsheets.batchUpdate({
+      spreadsheetId: this.sheetId,
+      requestBody: { requests },
+    });
+    return targets.length;
+  }
+
   async appendLog(logRow) {
     await this.#append(this.logsTab, [
       logRow.runDate, logRow.customer_id, logRow.name,

@@ -70,6 +70,15 @@
     padding:6px 13px;color:var(--blue-d);transition:.12s}
   .rowbtn:hover{border-color:var(--blue)}
   .rowbtn.on{color:var(--paused)}
+  .bulkbar{display:flex;align-items:center;gap:14px;margin-bottom:12px;padding:10px 14px;
+    background:var(--card);border:1px solid var(--line);border-radius:11px}
+  .bulkbar .selcount{font-size:13px;color:var(--muted);font-weight:600}
+  .delbtn{border:1px solid var(--miss);background:var(--card);color:var(--miss);font-weight:700;
+    font-size:13px;padding:7px 16px;border-radius:9px}
+  .delbtn:not(:disabled):hover{background:var(--miss);color:#fff}
+  .delbtn:disabled{opacity:.4;cursor:default;border-color:var(--line);color:var(--muted)}
+  td.chk,th.chk{width:40px;text-align:center}
+  input[type=checkbox]{width:17px;height:17px;accent-color:var(--blue);cursor:pointer}
   .empty{text-align:center;color:var(--muted);padding:46px 20px}
   .foot{padding:12px 16px;color:var(--muted);font-size:12px;background:var(--field)}
   .hide{display:none!important}
@@ -101,6 +110,10 @@
     <div class="tabs">
       <button id="tabC" class="on" onclick="show('customers')">客人設定紀錄</button>
       <button id="tabL" onclick="show('logs')">執行記錄</button>
+    </div>
+    <div class="bulkbar hide" id="bulkbar">
+      <span id="selCount" class="selcount">已選 0 筆</span>
+      <button class="delbtn" id="delBtn" onclick="deleteSelected()" disabled>刪除選取</button>
     </div>
     <div class="panel"><div class="scrollx"><div id="content"></div></div>
       <div class="foot" id="foot"></div>
@@ -161,6 +174,7 @@ function loadCustomers(){
     var rows=list.map(function(c){
       var st=c.status==='active';
       return '<tr>'+
+        '<td class="chk"><input type="checkbox" class="rowchk" value="'+c.customer_id+'" onchange="onRowCheck()"></td>'+
         '<td><div class="name">'+esc(c.name)+(isDue(c)?'<span class="pill due">今天要排</span>':'')+'</div><div class="sub">'+esc(c.address)+'</div></td>'+
         '<td>'+esc(c.fixedTime)+'</td>'+
         '<td>'+esc(freqText(c))+'</td>'+
@@ -171,11 +185,40 @@ function loadCustomers(){
       '</tr>';
     }).join('');
     document.getElementById('content').innerHTML=
-      '<table><thead><tr><th>客戶 / 地址</th><th>備貨好時間</th><th>取件日</th><th>聯絡</th><th>備註</th><th>狀態</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
-    document.getElementById('foot').textContent='共 '+list.length+' 位客人　·　可隨時按「暫停」讓某位客人先不排(例如請假、歇業),需要時再「啟用」';
+      '<table><thead><tr><th class="chk"><input type="checkbox" id="selAll" onchange="toggleAll(this.checked)"></th><th>客戶 / 地址</th><th>備貨好時間</th><th>取件日</th><th>聯絡</th><th>備註</th><th>狀態</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+    document.getElementById('foot').textContent='共 '+list.length+' 位客人　·　勾選左側可一次刪除多筆;「暫停」讓某位客人先不排(請假、歇業用),需要時再「啟用」';
+    document.getElementById('bulkbar').classList.remove('hide');
+    onRowCheck();
   });
 }
+
+// ---- 多選刪除 ----
+function selectedIds(){
+  return Array.prototype.slice.call(document.querySelectorAll('.rowchk:checked')).map(function(x){return x.value;});
+}
+function onRowCheck(){
+  var n=selectedIds().length, total=document.querySelectorAll('.rowchk').length;
+  var btn=document.getElementById('delBtn');
+  document.getElementById('selCount').textContent='已選 '+n+' 筆';
+  btn.disabled = n===0;
+  btn.textContent = n>0 ? ('刪除選取('+n+')') : '刪除選取';
+  var selAll=document.getElementById('selAll');
+  if(selAll) selAll.checked = total>0 && n===total;
+}
+function toggleAll(on){
+  document.querySelectorAll('.rowchk').forEach(function(x){ x.checked=on; });
+  onRowCheck();
+}
+function deleteSelected(){
+  var ids=selectedIds();
+  if(ids.length===0) return;
+  if(!confirm('確定要刪除選取的 '+ids.length+' 筆客人設定嗎?此動作無法復原。')) return;
+  api('/api/admin/delete',{method:'POST',body:JSON.stringify({customer_ids:ids})})
+    .then(function(d){ loadCustomers(); })
+    .catch(function(){ alert('刪除失敗,請重新登入或稍後再試。'); });
+}
 function loadLogs(){
+  document.getElementById('bulkbar').classList.add('hide');
   api('/api/admin/logs').then(function(d){
     var list=d.logs||[];
     var today=todayStr();

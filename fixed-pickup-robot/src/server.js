@@ -81,6 +81,20 @@ app.post('/api/admin/status', requireAdmin, async (req, res) => {
   }
 });
 
+// 刪除一筆或多筆客人設定(customer_ids: 陣列)
+app.post('/api/admin/delete', requireAdmin, async (req, res) => {
+  try {
+    const ids = req.body.customer_ids;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ ok: false, error: '請提供要刪除的 customer_ids 陣列' });
+    }
+    const removed = await store.deleteCustomers(ids);
+    res.json({ ok: true, removed });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 app.listen(config.port, () => {
   log.info(`表單伺服器啟動:http://localhost:${config.port}`);
   log.info(`  客人設定表單:  http://localhost:${config.port}/`);

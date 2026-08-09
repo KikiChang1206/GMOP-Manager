@@ -44,6 +44,16 @@ export class LocalJsonStore {
     writeJson(CUSTOMERS, all);
   }
 
+  // 刪除一筆或多筆客人設定(傳入 customer_id 陣列),回傳實際刪除筆數
+  async deleteCustomers(customerIds) {
+    const ids = new Set(customerIds || []);
+    const all = readJson(CUSTOMERS, []);
+    const remain = all.filter((c) => !ids.has(c.customer_id));
+    const removed = all.length - remain.length;
+    writeJson(CUSTOMERS, remain);
+    return removed;
+  }
+
   async appendLog(logRow) {
     const all = readJson(LOGS, []);
     all.push(logRow);

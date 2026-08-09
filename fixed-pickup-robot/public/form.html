@@ -87,6 +87,13 @@
   .done p{color:var(--muted);font-size:15px;line-height:1.8;margin:0 auto;max-width:460px}
   .done .again{margin-top:26px;padding:12px 26px;border:1px solid var(--line);background:var(--card);
     color:var(--blue-d);border-radius:11px;font-size:15px;font-weight:700}
+  .summary{max-width:460px;margin:22px auto 0;text-align:left;border:1px solid var(--line);
+    border-radius:12px;overflow:hidden}
+  .summary .row{display:flex;padding:11px 16px;border-bottom:1px solid var(--line);font-size:14px}
+  .summary .row:last-child{border-bottom:none}
+  .summary .row:nth-child(odd){background:var(--field)}
+  .summary .k{width:96px;color:var(--muted);font-weight:600;flex-shrink:0}
+  .summary .v{color:var(--text);font-weight:600;word-break:break-all}
 
   .hide{display:none!important}
   @media (max-width:640px){
@@ -167,7 +174,8 @@
   <div id="doneView" class="card done hide">
     <div class="tick">✓</div>
     <h2>設定完成!</h2>
-    <p>你的固定取件已建立,系統會從生效日起,依你設定的取件日每天自動安排。若需請假或暫停,請聯絡本公司業務。</p>
+    <p>以下是這次送出的內容,請再核對一次。系統會從生效日起,依取件日每天自動安排。</p>
+    <div id="doneSummary" class="summary"></div>
     <button class="again" id="again">再新增一筆</button>
   </div>
 </div>
@@ -246,6 +254,21 @@
         showErr((data.errors ? data.errors.join('、') : data.error) || '送出失敗,請檢查欄位。');
         return;
       }
+      // 完成畫面列出剛送出的內容,讓填寫的同事自己核對
+      var WD=['','週一','週二','週三','週四','週五','週六','週日'];
+      var dayNums=payload.weekdays.split(',').filter(Boolean).map(Number);
+      var dayText=dayNums.join(',')==='1,2,3,4,5' ? '每天(週一~五)' : dayNums.map(function(d){return WD[d];}).join('、');
+      var rows=[
+        ['客戶名稱',payload.name],['取件地址',payload.address],
+        ['備貨好時間',payload.fixedTime],['取件日',dayText],
+        ['聯絡電話',payload.phone],['現場聯絡人',payload.contact],
+        ['生效日期',payload.effectiveDate]
+      ];
+      if(payload.customerNote) rows.push(['備註',payload.customerNote]);
+      document.getElementById('doneSummary').innerHTML = rows.map(function(x){
+        return '<div class="row"><span class="k">'+x[0]+'</span><span class="v">'+
+          String(x[1]).replace(/[&<>]/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[m];})+'</span></div>';
+      }).join('');
       document.getElementById('formView').classList.add('hide');
       document.getElementById('doneView').classList.remove('hide');
       window.scrollTo({top:0});
