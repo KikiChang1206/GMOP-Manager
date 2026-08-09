@@ -11,11 +11,12 @@
 // ============================================================
 
 export const selectors = {
-  // ---- 登入頁 ----
+  // ---- 登入頁(三欄:編號 / 帳號 / 密碼)----
   login: {
-    username: 'input[name="username"], input[type="text"]',
-    password: 'input[name="password"], input[type="password"]',
-    submit: 'button[type="submit"], button:has-text("登入")',
+    code: 'input[placeholder="編號"]',                                  // 第一欄「編號」
+    username: 'input[placeholder="Account"], input[name="username"]',   // 第二欄「帳號 / Account」
+    password: 'input[placeholder="Password"], input[type="password"]',  // 第三欄「密碼」
+    submit: 'input[value="signin" i], button:has-text("signin"), input[type="submit"], button[type="submit"]',
     // 登入成功後應會出現的元素(用來確認登入完成)
     successMarker: 'text=代收包裹',
   },

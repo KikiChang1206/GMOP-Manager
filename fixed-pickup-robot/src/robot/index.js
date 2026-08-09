@@ -34,6 +34,7 @@ async function fillField(scope, selector, value, timeout) {
 async function login(page) {
   log.info('登入 system.goodmaji.com …');
   await page.goto(config.goodmaji.url, { waitUntil: 'domcontentloaded' });
+  await fillField(page, selectors.login.code, config.goodmaji.code, config.run.stepTimeoutMs);
   await fillField(page, selectors.login.username, config.goodmaji.username, config.run.stepTimeoutMs);
   await fillField(page, selectors.login.password, config.goodmaji.password, config.run.stepTimeoutMs);
   await page.locator(selectors.login.submit).first().click();

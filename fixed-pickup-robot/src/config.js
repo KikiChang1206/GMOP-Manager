@@ -35,8 +35,9 @@ export const config = {
 
   goodmaji: {
     url: process.env.GOODMAJI_URL || 'https://system.goodmaji.com',
-    username: process.env.GOODMAJI_USERNAME || '',
-    password: process.env.GOODMAJI_PASSWORD || '',
+    code: process.env.GOODMAJI_CODE || '',          // 登入第一欄「編號」
+    username: process.env.GOODMAJI_USERNAME || '',   // 登入第二欄「帳號 / Account」
+    password: process.env.GOODMAJI_PASSWORD || '',   // 登入第三欄「密碼 / Password」
   },
 
   line: {

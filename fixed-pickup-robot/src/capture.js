@@ -29,8 +29,9 @@ try {
   await page.waitForTimeout(1500);
   await snap(page, '1-login-page');
 
-  // 嘗試登入(best-effort;選擇器不準也沒關係,後面用擷取的原始碼校準)
+  // 嘗試登入(三欄:編號 / 帳號 / 密碼;best-effort,選擇器不準也沒關係,後面用擷取的原始碼校準)
   try {
+    await page.locator(selectors.login.code).first().fill(config.goodmaji.code);
     await page.locator(selectors.login.username).first().fill(config.goodmaji.username);
     await page.locator(selectors.login.password).first().fill(config.goodmaji.password);
     await page.locator(selectors.login.submit).first().click();
