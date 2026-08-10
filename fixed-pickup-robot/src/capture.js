@@ -64,17 +64,19 @@ try {
   }
   console.log('──────────────────────────\n');
 
-  // 只有登入成功才嘗試導覽到「代收包裹 → 一般代取」
+  await snap(page, '3-pickup-page');
+
+  // 登入成功後,直接開啟「代收包裹」內層頁面 collection.aspx(真正的表單所在)
   if (!hasError && !stillOnLogin) {
     try {
-      await page.locator(selectors.nav.parcelMenu).first().click();
-      await page.waitForTimeout(1500);
-      await page.locator(selectors.nav.generalPickupTab).first().click();
-      await page.waitForTimeout(2000);
-      console.log('已嘗試導覽到 代收包裹 → 一般代取');
-    } catch (e) { console.log('導覽步驟出錯(選單選擇器待校準):', e.message); }
+      const collectionUrl = new URL('collection.aspx?method=get', config.goodmaji.url).href;
+      console.log('前往代收包裹內層頁:', collectionUrl);
+      await page.goto(collectionUrl, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(3000);
+      await snap(page, '4-collection');
+      console.log('目前網址:', page.url());
+    } catch (e) { console.log('開啟 collection.aspx 出錯:', e.message); }
   }
-  await snap(page, '3-pickup-page');
 
   console.log('\n完成 ✅ 若上面顯示登入成功,請把 logs/capture 壓縮傳回校準;若失敗,先修正 .env 再重跑。');
 } catch (e) {
