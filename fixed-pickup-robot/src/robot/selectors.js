@@ -11,12 +11,12 @@
 // ============================================================
 
 export const selectors = {
-  // ---- 登入頁(三欄:編號 / 帳號 / 密碼)----
+  // ---- 登入頁(三欄:編號 / 帳號 / 密碼)。依實際頁面 login.aspx 的欄位 ID ----
   login: {
-    code: 'input[placeholder="編號"]',                                  // 第一欄「編號」
-    username: 'input[placeholder="Account"], input[name="username"]',   // 第二欄「帳號 / Account」
-    password: 'input[placeholder="Password"], input[type="password"]',  // 第三欄「密碼」
-    submit: 'input[value="signin" i], button:has-text("signin"), input[type="submit"], button[type="submit"]',
+    code: '#number',        // 第一欄「編號」   <input id="number">
+    username: '#account',   // 第二欄「帳號」   <input id="account">
+    password: '#password',  // 第三欄「密碼」   <input id="password">
+    submit: '#SignIn',      // 登入鈕           <input id="SignIn" value="signin">
     // 登入成功後應會出現的元素(用來確認登入完成)
     successMarker: 'text=代收包裹',
   },
