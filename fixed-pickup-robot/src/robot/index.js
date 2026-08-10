@@ -140,6 +140,12 @@ export async function runRobot(customers, opts = {}) {
   const page = await context.newPage();
   page.setDefaultTimeout(config.run.stepTimeoutMs);
 
+  // 記錄網頁彈出訊息(例如儲存時的驗證 alert),方便診斷
+  page.on('dialog', async (d) => {
+    log.warn('網頁彈出訊息:', d.message());
+    try { await d.dismiss(); } catch { /* ignore */ }
+  });
+
   const filled = [];
   const fillFailed = [];
 
@@ -166,6 +172,7 @@ export async function runRobot(customers, opts = {}) {
       log.info(`統一儲存 ${filled.length} 筆 …`);
       await page.locator(selectors.table.saveButton).first().click();
       await page.waitForTimeout(3000); // 等待儲存 postback 完成
+      await saveToCapture(page, '6-saved'); // 存證:儲存後的畫面
     } else {
       log.warn('沒有任何成功填寫的列,略過儲存');
     }
