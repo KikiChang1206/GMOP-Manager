@@ -55,8 +55,8 @@ export const config = {
   },
 
   run: {
-    packageCount: '1',            // 固定業務規則:預設包裹數 1(實際件數由司機現場確認)
-    note: '請確認實際件數',        // 固定業務規則:備註提醒司機確認件數
+    packageCount: '1',   // 固定業務規則:預設包裹數 1(實際件數由司機現場確認)
+    receiver: 'API',     // 固定業務規則:取件人一律填「API」,代表此筆為自動新增、需確認件數
     headless: bool(process.env.HEADLESS, true),
     stepTimeoutMs: parseInt(process.env.STEP_TIMEOUT_MS || '15000', 10),
     dryRun: bool(process.env.DRY_RUN, false),

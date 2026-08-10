@@ -9,7 +9,6 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { config, ROOT } from '../config.js';
 import { log } from '../logger.js';
-import { composeSystemNote } from '../schedule.js';
 import { selectors } from './selectors.js';
 import { verifyAgainstSystem } from './verify.js';
 
@@ -108,14 +107,15 @@ async function addOneCustomer(page, customer) {
     const idx = await findNewRowIndex(page, rowsSel);
     if (idx === null) throw new Error('找不到新增的空白列');
 
-    // c. 逐欄填寫(取件人 receiver 依業務規則留空白,不填)
+    // c. 逐欄填寫
     const f = selectors.rowFields;
     await setField(page, f.customer, idx, customer.name, t);
+    await setField(page, f.receiver, idx, config.run.receiver, t);   // 取件人一律填「API」
     await setField(page, f.address, idx, customer.address, t);
     await setField(page, f.date, idx, todayMMDD(), t);
     await setField(page, f.time, idx, customer.fixedTime, t);
     await setField(page, f.packageCount, idx, config.run.packageCount, t);
-    await setField(page, f.note, idx, composeSystemNote(customer, config.run.note), t);
+    await setField(page, f.note, idx, (customer.customerNote || '').trim(), t); // 備註只放客人原本備註
     await setField(page, f.phone, idx, customer.phone, t);
     await setField(page, f.contact, idx, customer.contact, t);
 
