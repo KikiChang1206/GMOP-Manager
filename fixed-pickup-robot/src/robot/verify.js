@@ -16,20 +16,14 @@ function norm(s) {
 export async function verifyAgainstSystem(page, plannedCustomers) {
   let systemText = '';
   try {
-    // 嘗試按查詢按鈕重新撈當天資料(若頁面本來就顯示則略過亦可)
-    const queryBtn = page.locator(selectors.verify.queryButton).first();
-    if (await queryBtn.count()) {
-      await queryBtn.click();
-      await page.waitForTimeout(1500);
-    }
-    // 讀整張表格的文字,作為比對基底(比逐格定位更耐改版)
-    const rows = page.locator(selectors.verify.resultRows);
-    const count = await rows.count();
-    const texts = [];
-    for (let i = 0; i < count; i++) {
-      texts.push(norm(await rows.nth(i).innerText()));
-    }
-    systemText = texts.join('\n');
+    // 儲存後頁面會重新載入並顯示當天清單;讀取每列「客戶」「地址」欄的實際值來比對
+    systemText = await page.evaluate((sel) => {
+      const vals = [];
+      document.querySelectorAll(sel).forEach((e) => vals.push(e.value || ''));
+      // 一併讀地址欄
+      document.querySelectorAll('input[id^="rp1_addr_"]').forEach((e) => vals.push(e.value || ''));
+      return vals.join('\n');
+    }, selectors.verify.customerInputs);
   } catch (e) {
     // 查詢本身失敗:保守起見,全部視為「無法確認」= 缺漏,提醒人工檢查
     log.error('反查查詢失敗,全部標記為待人工確認', e.message);

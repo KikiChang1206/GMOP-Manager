@@ -55,10 +55,11 @@ export const config = {
   },
 
   run: {
-    packageCount: process.env.DEFAULT_PACKAGE_COUNT ?? '0',
-    note: process.env.DEFAULT_NOTE || '件數確認中',
+    packageCount: '1',            // 固定業務規則:預設包裹數 1(實際件數由司機現場確認)
+    note: '請確認實際件數',        // 固定業務規則:備註提醒司機確認件數
     headless: bool(process.env.HEADLESS, true),
     stepTimeoutMs: parseInt(process.env.STEP_TIMEOUT_MS || '15000', 10),
     dryRun: bool(process.env.DRY_RUN, false),
+    noSave: bool(process.env.NO_SAVE, false),  // 只填不儲存(安全測試用)
   },
 };

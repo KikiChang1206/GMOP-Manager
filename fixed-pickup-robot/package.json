@@ -11,6 +11,7 @@
     "run:daily": "node src/run.js",
     "run:dry": "DRY_RUN=1 node src/run.js",
     "capture": "node src/capture.js",
+    "testfill": "node src/testfill.js",
     "install:browser": "npx playwright install --with-deps chromium"
   },
   "dependencies": {

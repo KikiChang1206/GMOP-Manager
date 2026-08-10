@@ -97,7 +97,8 @@ export function validateCustomer(input) {
 
 // 組出寫進系統備註欄的文字:固定「件數確認中」+ 客人自訂備註(設計文件第8節)
 export function composeSystemNote(customer, defaultNote) {
-  const base = defaultNote || '件數確認中';
+  const base = defaultNote || '請確認實際件數';
   const extra = (customer.customerNote || '').trim();
-  return extra ? `${base} / ${extra}` : base;
+  // 客戶自己的叮嚀在前,系統提醒在後,例:「取件請避開12-14點,請確認實際件數」
+  return extra ? `${extra},${base}` : base;
 }

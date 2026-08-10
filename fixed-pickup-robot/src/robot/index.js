@@ -3,6 +3,8 @@
 //   - 逐位新增,但最後統一按一次「儲存」
 //   - 任一客人失敗不中斷整批,記錄原因並截圖,繼續下一位
 //   - 儲存後一律做反查驗證(見 verify.js)
+//   - noSave 模式:只填不儲存(安全測試),並把畫面存到 logs/capture 供檢視
+import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { config, ROOT } from '../config.js';
@@ -12,9 +14,11 @@ import { selectors } from './selectors.js';
 import { verifyAgainstSystem } from './verify.js';
 
 const SHOT_DIR = path.join(ROOT, 'logs', 'screenshots');
+const CAPTURE_DIR = path.join(ROOT, 'logs', 'capture');
 
 async function screenshot(page, tag) {
   try {
+    fs.mkdirSync(SHOT_DIR, { recursive: true });
     const file = path.join(SHOT_DIR, `${tag}-${Date.now()}.png`);
     await page.screenshot({ path: file, fullPage: true });
     log.warn('已截圖存檔:', file);
@@ -24,9 +28,31 @@ async function screenshot(page, tag) {
   }
 }
 
-// 小工具:對 locator 做重試填值,失敗會拋出讓上層捕捉
+// 安全測試用:把當前頁面存到 logs/capture(截圖 + 原始碼),方便 scp 傳回檢視
+async function saveToCapture(page, tag) {
+  try {
+    fs.mkdirSync(CAPTURE_DIR, { recursive: true });
+    await page.screenshot({ path: path.join(CAPTURE_DIR, `${tag}.png`), fullPage: true });
+    fs.writeFileSync(path.join(CAPTURE_DIR, `${tag}.html`), await page.content());
+    log.info(`已存檢視檔:logs/capture/${tag}.png`);
+  } catch { /* ignore */ }
+}
+
+function todayMMDD() {
+  const d = new Date();
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
 async function fillField(scope, selector, value, timeout) {
   const el = scope.locator(selector).first();
+  await el.waitFor({ state: 'visible', timeout });
+  await el.fill(String(value));
+}
+
+// 依「欄位代號 + 列索引」組成實際 id(#rp1_<code>_<idx>)並填值。value 為空則略過。
+async function setField(page, code, idx, value, timeout) {
+  if (value === undefined || value === null || value === '') return;
+  const el = page.locator(`#rp1_${code}_${idx}`).first();
   await el.waitFor({ state: 'visible', timeout });
   await el.fill(String(value));
 }
@@ -43,36 +69,57 @@ async function login(page) {
   log.info('登入成功');
 }
 
+// 登入後直接開啟「代收包裹 → 一般代取」內層頁 collection.aspx(同 session)
 async function gotoGeneralPickup(page) {
-  log.info('導向 代收包裹 → 一般代取 …');
-  await page.locator(selectors.nav.parcelMenu).first().click();
-  await page.locator(selectors.nav.generalPickupTab).first().click();
-  await page.waitForTimeout(1000);
+  const url = new URL(selectors.nav.collectionPath, config.goodmaji.url).href;
+  log.info('開啟一般代取頁:', url);
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  await page.locator(selectors.table.addButton).first()
+    .waitFor({ state: 'visible', timeout: config.run.stepTimeoutMs });
 }
 
-// 新增並填寫單一客人;成功回傳 true,失敗回傳 false(不拋出以免中斷整批)
+// 找出剛新增的空白列索引(客戶欄為空的那一列)
+async function findNewRowIndex(page, rowsSel) {
+  return page.evaluate((sel) => {
+    const els = Array.from(document.querySelectorAll(sel));
+    const empties = els.filter((e) => !e.value.trim());
+    const target = empties.length ? empties[empties.length - 1] : els[els.length - 1];
+    if (!target) return null;
+    const m = target.id.match(/_(\d+)$/);
+    return m ? m[1] : null;
+  }, rowsSel);
+}
+
+// 新增並填寫單一客人;成功回傳 {ok:true},失敗回傳 {ok:false, reason}
 async function addOneCustomer(page, customer) {
   const t = config.run.stepTimeoutMs;
+  const rowsSel = selectors.table.rows;
   try {
-    // a. 點「新增」產生新空白列
+    // a. 按「新增」→ ASP.NET postback 產生新空白列,等列數增加
+    const before = await page.locator(rowsSel).count();
     await page.locator(selectors.table.addButton).first().click();
-    await page.waitForTimeout(400);
+    await page.waitForFunction(
+      ({ sel, n }) => document.querySelectorAll(sel).length > n,
+      { sel: rowsSel, n: before },
+      { timeout: t },
+    );
 
-    // b. 定位到最後一列(剛新增的那列),逐欄填寫
-    const rows = page.locator(selectors.table.rows);
-    const row = rows.last();
-    await row.waitFor({ state: 'visible', timeout: t });
+    // b. 找到剛新增的那一列索引
+    const idx = await findNewRowIndex(page, rowsSel);
+    if (idx === null) throw new Error('找不到新增的空白列');
 
-    await fillField(row, selectors.rowFields.customer, customer.name, t);
-    // 取件人:保持空白,不填(設計文件第8、10點,絕不可自動填值)
-    await fillField(row, selectors.rowFields.address, customer.address, t);
-    await fillField(row, selectors.rowFields.time, customer.fixedTime, t);
-    await fillField(row, selectors.rowFields.packageCount, config.run.packageCount, t);
-    await fillField(row, selectors.rowFields.note, composeSystemNote(customer, config.run.note), t);
-    await fillField(row, selectors.rowFields.phone, customer.phone, t);
-    await fillField(row, selectors.rowFields.contact, customer.contact, t);
+    // c. 逐欄填寫(取件人 receiver 依業務規則留空白,不填)
+    const f = selectors.rowFields;
+    await setField(page, f.customer, idx, customer.name, t);
+    await setField(page, f.address, idx, customer.address, t);
+    await setField(page, f.date, idx, todayMMDD(), t);
+    await setField(page, f.time, idx, customer.fixedTime, t);
+    await setField(page, f.packageCount, idx, config.run.packageCount, t);
+    await setField(page, f.note, idx, composeSystemNote(customer, config.run.note), t);
+    await setField(page, f.phone, idx, customer.phone, t);
+    await setField(page, f.contact, idx, customer.contact, t);
 
-    log.info(`已填寫:${customer.name}`);
+    log.info(`已填寫:${customer.name}(第 ${idx} 列)`);
     return { ok: true };
   } catch (e) {
     await screenshot(page, `fail-${customer.customer_id}`);
@@ -84,10 +131,11 @@ async function addOneCustomer(page, customer) {
 /**
  * 執行整批新增 + 儲存 + 反查驗證。
  * @param {object[]} customers 今天要新增的客人清單
- * @returns {{filled:object[], fillFailed:object[], confirmed:object[], missing:object[]}}
+ * @param {{noSave?:boolean}} opts noSave=true 時只填不儲存(安全測試)
  */
-export async function runRobot(customers) {
-  const browser = await chromium.launch({ headless: config.run.headless });
+export async function runRobot(customers, opts = {}) {
+  const noSave = opts.noSave ?? config.run.noSave ?? false;
+  const browser = await chromium.launch({ headless: config.run.headless, args: ['--no-sandbox'] });
   const context = await browser.newContext();
   const page = await context.newPage();
   page.setDefaultTimeout(config.run.stepTimeoutMs);
@@ -106,24 +154,27 @@ export async function runRobot(customers) {
       else fillFailed.push({ ...c, reason: r.reason });
     }
 
+    // 安全測試模式:只填不儲存,存檔供檢視後直接結束
+    if (noSave) {
+      await saveToCapture(page, '5-filled');
+      log.warn(`【NO_SAVE 安全測試】已填 ${filled.length} 筆,未按儲存。請檢視 logs/capture/5-filled.png`);
+      return { filled, fillFailed, confirmed: [], missing: fillFailed };
+    }
+
     // 統一按一次「儲存」
     if (filled.length > 0) {
       log.info(`統一儲存 ${filled.length} 筆 …`);
       await page.locator(selectors.table.saveButton).first().click();
-      await page.waitForTimeout(2500); // 等待儲存完成
+      await page.waitForTimeout(3000); // 等待儲存 postback 完成
     } else {
       log.warn('沒有任何成功填寫的列,略過儲存');
     }
 
     // 反查驗證:以實際系統資料為準(只驗證有成功填寫的那些)
     const { confirmed, missing } = await verifyAgainstSystem(page, filled);
-
-    // 填寫階段就失敗的,也一併算進缺漏(需人工補單)
     const allMissing = [...missing, ...fillFailed];
-
     return { filled, fillFailed, confirmed, missing: allMissing };
   } catch (e) {
-    // 登入 / 導覽等「整批共用步驟」失敗:整批視為缺漏
     await screenshot(page, 'fatal');
     log.error('整批流程發生嚴重錯誤:', e.message);
     return {
