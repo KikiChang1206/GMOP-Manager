@@ -8,6 +8,9 @@
 
 本專案依附的架構設計文件請見團隊內部文件；以下是實作與使用說明。
 
+> 📖 **日常操作(新增/暫停/刪除客戶、看執行記錄、缺漏補單)請看 [`操作手冊.md`](./操作手冊.md)。**
+> 本 README 偏技術總覽(架構、設定、部署、資料結構)。
+
 ---
 
 ## 這個專案包含什麼
@@ -47,7 +50,7 @@ npm run install:browser
 
 # 3) 建立 .env 設定檔，然後填入實際值
 cp .env.example .env
-nano .env      # 至少要填 GOODMAJI 帳密、ADMIN_PASSWORD；通知可先留空
+nano .env      # 至少要填 GOODMAJI 編號/帳號/密碼、ADMIN_PASSWORD；通知可先留空
 
 # 4) 啟動表單伺服器（給客人填、給你看）
 npm run server
@@ -55,48 +58,42 @@ npm run server
 #   管理者檢視頁： http://localhost:3000/admin
 ```
 
-### 測試每日排程（不會真的動系統）
+### 測試（不會誤動系統)
 
 ```bash
-# 只印出「今天要處理哪些客人」，不開瀏覽器、不寫入。先確認排程篩選正確。
-npm run run:dry
-
-# 正式跑一次（會開瀏覽器登入、新增、儲存、反查、發通知）
-npm run run:daily
+npm run run:dry     # 只印「今天要處理誰」，不開瀏覽器、不寫入
+npm run testfill    # 建一筆但「不儲存」，截圖到 logs/capture/5-filled.png（安全）
+npm run testsave    # 建一筆真的 + 反查驗證（測試資料記得刪）
+npm run run:daily   # 正式跑一次（登入→新增→儲存→反查）
 ```
-
-> 第一次正式跑，建議在 `.env` 設 `HEADLESS=0`，親眼看瀏覽器操作，
-> 對照 `src/robot/selectors.js` 調整選擇器（見下方「重要：選擇器需要校準」）。
 
 ---
 
-## 重要：選擇器需要校準
+## 選擇器（已校準完成，改版時再調整）
 
-`system.goodmaji.com` 需登入且會改版，`src/robot/selectors.js` 裡的選擇器是
-**依設計文件描述預先寫好的合理猜測**，第一次實跑時幾乎一定要對照實際頁面微調：
+所有頁面選擇器集中在 `src/robot/selectors.js`，已對照 `system.goodmaji.com` 實際頁面校準:
+- 登入(`login.aspx`)三欄:編號 `#number`、帳號 `#account`、密碼 `#password`、登入鈕 `#SignIn`。
+- 一般代取內層頁:`collection.aspx?method=get`;新增鈕 `#linkAdd`(postback)、儲存鈕 `#btnSave`;
+  各欄位 id 為 `rp1_<欄位>_<列索引>`(如地址 `rp1_addr_0`)。
 
-1. `.env` 設 `HEADLESS=0`，執行 `npm run run:daily`，看瀏覽器實際操作。
-2. 若某一步找不到元素、逾時，程式會**自動截圖存到 `logs/screenshots/`**、記錄原因，
-   並**跳過該客人繼續下一位**（不中斷整批）。
-3. 打開該頁面的開發者工具，把對應選擇器改到 `src/robot/selectors.js`。
-   建議優先用「文字定位」（如 `text=一般代取`），比 CSS class 耐改版。
-4. 選擇器全部集中在那一個檔案，之後網站改版只要改那裡。
+若 GoodMaji 改版導致大量缺漏:
+1. 主機為無桌面環境,用 `npm run capture` 擷取登入頁/代收頁的截圖與原始碼到 `logs/capture/`。
+2. 對照原始碼調整 `src/robot/selectors.js`(只需改這一個檔案)。
+3. 執行時若某步找不到元素,程式會**自動截圖到 `logs/screenshots/`**、記錄原因,
+   並**跳過該客人繼續下一位**(不中斷整批)。
 
 ---
 
 ## 每天自動執行（cron）
 
-參考 `scripts/crontab.example`：
+目前已設定(主機時區 `Asia/Taipei`,每天早上 **8:00** 執行):
 
 ```bash
-crontab -e
-# 貼入（路徑改成實際安裝位置）：
-30 7 * * *  cd /opt/fixed-pickup-robot && /usr/bin/node src/run.js >> logs/cron.log 2>&1
+0 8 * * *  cd /root/fixed-pickup-robot && /usr/bin/node src/run.js >> /root/fixed-pickup-robot/logs/cron.log 2>&1
 ```
 
-- 建議時間：系統當天可下單、且**早於司機排班**的時間。
-- 表單伺服器（`npm run server`）要另外常駐（建議用 `pm2` 或 systemd 顧著），
-  cron 只負責每天跑一次 `run.js`。
+- 表單伺服器(前台/後台)由 **pm2** 常駐(`pm2 status` / `pm2 restart pickup-form`),且已設**開機自動啟動**。
+- cron 只負責每天跑一次 `run.js`;執行日誌在 `logs/cron.log`。
 
 ---
 
@@ -123,10 +120,11 @@ crontab -e
 | 欄位 | 規則 |
 |---|---|
 | 客戶 | 客人設定值 |
-| 取件人 | **保持空白**，由派工人員事後指派 |
+| 取件人 | 固定填 **`API`**(標記為自動新增、需確認實際件數) |
+| 日期 | 執行當天(MM/DD) |
 | 地址 / 時間 / 電話 / 聯絡人 | 客人設定值 |
-| 包裹數 | 固定 `0`（`DEFAULT_PACKAGE_COUNT`） |
-| 備註 | 固定 `件數確認中`，若客人有備註則併入（`件數確認中 / xxx`） |
+| 包裹數 | 固定 `1` |
+| 備註 | 只帶入客人自己的備註(無則留空) |
 
 ### 反查驗證（防漏關鍵）
 
