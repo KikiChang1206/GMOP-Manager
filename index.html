@@ -2073,6 +2073,7 @@ function CaseCard({
   onReject,
   onUndo,
   onEmptyTrip,
+  onDelete,
   readOnly = false,
   canRevoke = false,
   onSession
@@ -2254,7 +2255,7 @@ function CaseCard({
       marginLeft: 10
     }
   }, (!readOnly || canRevoke) && (c.status === "已指派" || c.status === "待取件" || c.status === "已接單" || c.status === "已取件") && /*#__PURE__*/React.createElement(OverflowBtn, {
-    items: c.status === "已指派" ? [{
+    items: [].concat(c.status === "已指派" ? [{
       icon: "⚠️",
       label: "無法接單",
       color: C.orange,
@@ -2274,7 +2275,12 @@ function CaseCard({
       label: "退回給隊長",
       color: C.orange,
       action: onReject
-    }].filter(Boolean)
+    }].filter(Boolean), c.is_pre && onDelete ? [{
+      icon: "🗑️",
+      label: "刪除此筆 PRE",
+      color: C.red,
+      action: onDelete
+    }] : [])
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       background: cfg.soft,
@@ -2535,7 +2541,8 @@ function MyCasesTab({
   onEmptyTrip,
   onReorder,
   onSession,
-  onPreAdd
+  onPreAdd,
+  onDelete
 }) {
   const [section, setSection] = useState(0);
   const [sortMode, setSortMode] = useState(false);
@@ -2725,7 +2732,8 @@ function MyCasesTab({
     onPickup: () => onPickup(c.id),
     onReject: () => onReject(c.id),
     onUndo: () => onUndo(c.id),
-    onEmptyTrip: () => onEmptyTrip(c.id)
+    onEmptyTrip: () => onEmptyTrip(c.id),
+    onDelete: onDelete && (() => onDelete(c.id))
   })))));
 }
 
@@ -3890,6 +3898,10 @@ function MainApp({
     status: "待取件",
     pickup_at: null
   } : c));
+  const handleDeleteCase = id => {
+    if (!window.confirm("確定要刪除這筆 PRE 加收案件嗎？刪除後無法復原。")) return;
+    setCases(cs => cs.filter(c => c.id !== id));
+  };
   const handlePreAdd = ({
     source,
     address,
@@ -4227,7 +4239,8 @@ function MainApp({
     onEmptyTrip: id => setEmptyTripModal(id),
     onReorder: handleReorder,
     onSession: handleSession,
-    onPreAdd: () => setPreAddModal(true)
+    onPreAdd: () => setPreAddModal(true),
+    onDelete: handleDeleteCase
   }), isCaptain && tab === 1 && /*#__PURE__*/React.createElement(TeamTab, {
     cases: cases,
     me: me,
