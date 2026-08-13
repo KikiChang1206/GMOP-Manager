@@ -5176,6 +5176,7 @@ function AccountsAdmin({
   accounts,
   setAccounts
 }) {
+  const [sub, setSub] = useState("staff");
   const [dForm, setDForm] = useState({
     code: "",
     name: "",
@@ -5316,9 +5317,29 @@ function AccountsAdmin({
       maxWidth: 430,
       margin: "0 auto"
     }
-  },
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 16
+    }
+  }, ["staff", "customer"].map(k => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    onClick: () => setSub(k),
+    style: {
+      flex: 1,
+      background: sub === k ? C.blue : C.grayLight,
+      border: `1.5px solid ${sub === k ? C.blue : C.grayBorder}`,
+      borderRadius: 12,
+      padding: "11px",
+      color: sub === k ? C.white : C.gray,
+      fontSize: 14,
+      fontWeight: 800,
+      cursor: "pointer"
+    }
+  }, k === "staff" ? "🚚 員工帳號" : "🧑‍💼 客人帳號"))),
   // ── 司機／隊長 帳號 ──
-  /*#__PURE__*/React.createElement("div", {
+  sub === "staff" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: card
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -5489,9 +5510,9 @@ function AccountsAdmin({
   }, STAFF_ROLES.map(r => /*#__PURE__*/React.createElement("option", {
     key: r,
     value: r
-  }, roleName(r))))))),
+  }, roleName(r)))))))),
   // ── 客人 帳號 ──
-  /*#__PURE__*/React.createElement("div", {
+  sub === "customer" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       ...card,
       marginTop: 8
@@ -5622,7 +5643,7 @@ function AccountsAdmin({
   }, "登入代碼：", a.code)), /*#__PURE__*/React.createElement("button", {
     onClick: () => del(a.code, a.name),
     style: smallBtn("transparent", C.redLight, C.red)
-  }, "刪除"))));
+  }, "刪除")))));
 }
 
 function AdminScreen({
