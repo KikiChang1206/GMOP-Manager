@@ -95,6 +95,27 @@ app.post('/api/admin/delete', requireAdmin, async (req, res) => {
   }
 });
 
+// 編輯既有客人設定(customer_id + 欄位;沿用與新增相同的驗證)
+app.post('/api/admin/update', requireAdmin, async (req, res) => {
+  try {
+    const { customer_id } = req.body;
+    if (!customer_id) return res.status(400).json({ ok: false, error: '缺少 customer_id' });
+    const errors = validateCustomer(req.body);
+    if (errors.length) return res.status(400).json({ ok: false, errors });
+    const f = req.body;
+    await store.updateCustomer(customer_id, {
+      name: f.name, address: f.address, fixedTime: f.fixedTime, phone: f.phone,
+      contact: f.contact, frequencyType: f.frequencyType, weekdays: f.weekdays,
+      effectiveDate: f.effectiveDate, customerNote: f.customerNote,
+    });
+    log.info('編輯客人設定:', f.name, customer_id);
+    res.json({ ok: true });
+  } catch (e) {
+    log.error('編輯客人設定失敗:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 app.listen(config.port, () => {
   log.info(`表單伺服器啟動:http://localhost:${config.port}`);
   log.info(`  客人設定表單:  http://localhost:${config.port}/`);

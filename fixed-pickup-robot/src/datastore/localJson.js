@@ -44,6 +44,19 @@ export class LocalJsonStore {
     writeJson(CUSTOMERS, all);
   }
 
+  // 編輯既有客人設定:只更新允許的欄位,customer_id / status / createdAt 保持不變
+  async updateCustomer(customerId, fields) {
+    const all = readJson(CUSTOMERS, []);
+    const row = all.find((c) => c.customer_id === customerId);
+    if (!row) throw new Error(`找不到 customer_id=${customerId}`);
+    const allowed = ['name', 'address', 'fixedTime', 'phone', 'contact',
+      'frequencyType', 'weekdays', 'effectiveDate', 'customerNote'];
+    for (const k of allowed) {
+      if (fields[k] !== undefined) row[k] = fields[k];
+    }
+    writeJson(CUSTOMERS, all);
+  }
+
   // 刪除一筆或多筆客人設定(傳入 customer_id 陣列),回傳實際刪除筆數
   async deleteCustomers(customerIds) {
     const ids = new Set(customerIds || []);

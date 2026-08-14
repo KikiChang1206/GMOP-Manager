@@ -96,6 +96,26 @@ export class GoogleSheetsStore {
     });
   }
 
+  // 編輯既有客人設定:更新 B~J 欄(name~customerNote),保留 id/狀態/建立時間
+  async updateCustomer(customerId, fields) {
+    const rows = await this.#read(this.customersTab);
+    const idx = rows.findIndex((r, i) => i > 0 && r[0] === customerId);
+    if (idx < 0) throw new Error(`找不到 customer_id=${customerId}`);
+    const r = rows[idx];
+    const pick = (col, key) => (fields[key] !== undefined ? fields[key] : (r[col] ?? ''));
+    const values = [[
+      pick(1, 'name'), pick(2, 'address'), pick(3, 'fixedTime'), pick(4, 'phone'),
+      pick(5, 'contact'), pick(6, 'frequencyType'), pick(7, 'weekdays'),
+      pick(8, 'effectiveDate'), pick(9, 'customerNote'),
+    ]];
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.sheetId,
+      range: `${this.customersTab}!B${idx + 1}:J${idx + 1}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values },
+    });
+  }
+
   // 取得分頁的數字 sheetId(刪列時需要)
   async #tabId(title) {
     const meta = await this.sheets.spreadsheets.get({ spreadsheetId: this.sheetId });
