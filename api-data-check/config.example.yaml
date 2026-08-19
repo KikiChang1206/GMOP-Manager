@@ -1,0 +1,80 @@
+# ==================================================================
+#  網站操作設定 (非機密，可 commit)
+#  複製成 config.yaml 後，把下面標了「# TODO」的選擇器改成
+#  system.goodmaji.com 實際頁面上的元素。
+#
+#  選擇器 (selector) 可用 Playwright 支援的任何寫法：
+#    - CSS：            "#txtUserName"、"input[name='pwd']"
+#    - 文字定位：        "text=登入"、"text=匯出Excel"
+#    - role 定位：       "role=button[name='查詢']"
+#    - XPath：          "xpath=//a[contains(text(),'API')]"
+#  找不到元素時，程式會把當下頁面截圖 + HTML 存到 output/ 方便你對照。
+# ==================================================================
+
+# 執行時是否顯示瀏覽器視窗 (伺服器上請設 false / headless)
+headless: true
+
+# 每一步操作的等待逾時 (毫秒)
+timeout_ms: 30000
+
+# ------------------------------------------------------------------
+# 1) 登入
+# ------------------------------------------------------------------
+login:
+  username_selector: "#txtAccount"          # TODO: 帳號輸入框
+  password_selector: "#txtPassword"         # TODO: 密碼輸入框
+  submit_selector: "#btnLogin"              # TODO: 登入按鈕
+  # 登入成功後「一定會出現」的元素，用來確認登入成功
+  success_selector: "text=登出"             # TODO: 例如登出連結、使用者名稱
+
+# ------------------------------------------------------------------
+# 2) 導覽到「未成功 API 資料」的頁面
+#    steps 會依序執行；type 可為 goto / click / fill / wait / select
+# ------------------------------------------------------------------
+navigate_to_check:
+  steps:
+    # 直接前往固定網址 (若該頁有固定 URL，最穩)
+    - { type: goto, url: "https://system.goodmaji.com/web/xxxxx.aspx" }   # TODO
+    # 或改用點選單的方式，例如：
+    # - { type: click, selector: "text=資料管理" }
+    # - { type: click, selector: "text=API 上傳結果" }
+    # - { type: wait,  selector: "#gridResult" }
+
+# ------------------------------------------------------------------
+# 3) 檢查是否有「未成功」的資料
+#    程式會在資料表中，找 status 欄位符合 fail_text 的列。
+# ------------------------------------------------------------------
+check_failures:
+  # 資料表 / 列表容器
+  table_selector: "#gridResult"                 # TODO: 結果表格
+  # 每一列 (通常是 tr)
+  row_selector: "#gridResult tr"                # TODO
+  # 判斷「未成功」的關鍵字 (列中含這些文字就算未成功)
+  fail_text: ["失敗", "未成功", "錯誤", "Fail"]
+  # 「原因」欄位在列中的相對選擇器 (相對於 row)；留空則抓整列文字
+  reason_selector: "td.reason"                  # TODO: 未上傳原因欄
+
+# ------------------------------------------------------------------
+# 4) 匯出成 Excel (.xls)
+#    模式二選一：
+#    mode: download  -> 直接按網站的「匯出」按鈕下載檔案 (最能保留原格式)
+#    mode: scrape    -> 由程式讀取表格內容，自行產生 .xls
+# ------------------------------------------------------------------
+export:
+  mode: download
+  # --- mode: download 用 ---
+  export_button_selector: "text=匯出Excel"       # TODO: 匯出按鈕
+  # --- mode: scrape 用 (自行產生 .xls 時的表頭；留空則自動抓 thead) ---
+  headers: []
+
+# ------------------------------------------------------------------
+# 5) 重新上傳 .xls
+# ------------------------------------------------------------------
+upload:
+  steps:
+    # 前往上傳頁 (若和檢查頁不同)
+    - { type: goto, url: "https://system.goodmaji.com/web/upload.aspx" }  # TODO
+  file_input_selector: "input[type=file]"       # TODO: 檔案選擇欄位
+  submit_selector: "text=上傳"                  # TODO: 送出上傳按鈕
+  # 上傳成功後會出現的元素/文字，用來確認成功
+  success_selector: "text=上傳成功"             # TODO

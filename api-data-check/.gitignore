@@ -1,0 +1,14 @@
+# 機密與本機設定
+.env
+config.yaml
+
+# 執行產物
+output/
+*.xls
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
