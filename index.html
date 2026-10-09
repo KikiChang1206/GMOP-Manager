@@ -1465,6 +1465,7 @@ function PickupModal({
     },
     style: {
       flex: 1,
+      minWidth: 0,
       background: C.grayLight,
       border: `1.5px solid ${pcs !== net(c) ? C.orange : C.grayBorder}`,
       borderRadius: 14,
@@ -1514,7 +1515,7 @@ function PickupModal({
       fontWeight: 600,
       marginBottom: 5
     }
-  }, "這次取件狀況／備註（給之後的司機參考）"), /*#__PURE__*/React.createElement("textarea", {
+  }, "取件備註"), /*#__PURE__*/React.createElement("textarea", {
     value: remark,
     onChange: e => setRemark(e.target.value),
     placeholder: "例如：大門走後巷、需提前電話、客戶常臨時加件…",
@@ -1530,7 +1531,7 @@ function PickupModal({
       fontWeight: 600,
       marginBottom: 5
     }
-  }, "地址（如需修改）"), /*#__PURE__*/React.createElement("input", {
+  }, "地址"), /*#__PURE__*/React.createElement("input", {
     value: address,
     onChange: e => setAddress(e.target.value),
     placeholder: "取件地址",
@@ -1544,7 +1545,7 @@ function PickupModal({
       fontWeight: 600,
       marginBottom: 5
     }
-  }, "電話（如需修改）"), /*#__PURE__*/React.createElement("input", {
+  }, "電話"), /*#__PURE__*/React.createElement("input", {
     value: phone,
     onChange: e => setPhone(e.target.value),
     placeholder: "聯絡電話",
@@ -4006,11 +4007,11 @@ function MainApp({
       id,
       status: "已取件",
       driver_id: me,
-      customer: "數網",
+      customer: "A" + (src ? src.customer : ""),
       pre_code: "數網",
       is_pre: true,
       source_customer: src ? src.customer : "",
-      name: src ? src.customer : "",
+      name: "數網",
       address: src ? src.address : "",
       phone: src ? src.phone : "",
       pickup_time: nowStr(),
