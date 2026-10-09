@@ -2326,7 +2326,7 @@ function CaseCard({
       fontSize: 17,
       fontWeight: 800
     }
-  }, "🕐 ", c.pickup_time || c.pickup_date)), /*#__PURE__*/React.createElement("div", {
+  }, "🕐 ", isDone ? c.pickup_at : c.pickup_time || c.pickup_date)), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 20,
       fontWeight: 900,
@@ -2389,12 +2389,12 @@ function CaseCard({
       fontSize: 20,
       lineHeight: 1
     }
-  }, net(c)), /*#__PURE__*/React.createElement("div", {
+  }, isDone ? c.pcs_actual ?? net(c) : net(c)), /*#__PURE__*/React.createElement("div", {
     style: {
       color: cfg.color,
       fontSize: 10
     }
-  }, "件")))), /*#__PURE__*/React.createElement("div", {
+  }, "件")))), !isDone && /*#__PURE__*/React.createElement("div", {
     style: {
       borderTop: `1px dashed ${C.grayBorder}`,
       paddingTop: 10,
@@ -2507,50 +2507,13 @@ function CaseCard({
       flexDirection: "column",
       gap: 8
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, c.edited && /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      gap: 8
+      color: C.red,
+      fontSize: 13,
+      fontWeight: 700
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1,
-      background: C.greenLight,
-      borderRadius: 10,
-      padding: "8px",
-      textAlign: "center"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: C.green,
-      fontWeight: 900,
-      fontSize: 18
-    }
-  }, c.pcs_actual ?? net(c)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: C.green,
-      fontSize: 10
-    }
-  }, "實際件數")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1,
-      background: C.greenLight,
-      borderRadius: 10,
-      padding: "8px",
-      textAlign: "center"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: C.green,
-      fontWeight: 700,
-      fontSize: 14
-    }
-  }, c.pickup_at), /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: C.green,
-      fontSize: 10
-    }
-  }, "取件時間"))), (c.sig_url || c.photo_url) && /*#__PURE__*/React.createElement("div", {
+  }, "📝 本次有修改資料"), (c.sig_url || c.photo_url) && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8
@@ -3977,6 +3940,7 @@ function MainApp({
     shuWang
   }) => {
     const src = cases.find(c => c.id === pickupModal);
+    const edited = !!src && (address !== (src.address || "") || phone !== (src.phone || "") || remark !== (src.remark || ""));
     setCases(cs => cs.map(c => c.id === pickupModal ? {
       ...c,
       status: "已取件",
@@ -3984,12 +3948,13 @@ function MainApp({
       address,
       remark,
       phone,
+      edited,
       pickup_at: nowStr(),
       sig_url: sigData || null,
       photo_url: photoUrl || null
     } : c));
     const sw = Number(shuWang);
-    if (sw > 0) addShuWang(src, sw);
+    if (sw > 0) addShuWang(src, sw, address, phone);
     setPickupModal(null);
   };
   const handleUndo = id => setCases(cs => cs.map(c => c.id === id ? {
@@ -4001,7 +3966,7 @@ function MainApp({
     if (!window.confirm("確定要刪除這筆「數網」案件嗎？刪除後無法復原。")) return;
     setCases(cs => cs.filter(c => c.id !== id));
   };
-  const addShuWang = (src, pcs) => {
+  const addShuWang = (src, pcs, addr, phone) => {
     const id = "SW-" + Date.now().toString().slice(-6);
     setCases(cs => [...cs, {
       id,
@@ -4012,8 +3977,8 @@ function MainApp({
       is_pre: true,
       source_customer: src ? src.customer : "",
       name: "數網",
-      address: src ? src.address : "",
-      phone: src ? src.phone : "",
+      address: addr != null ? addr : (src ? src.address : ""),
+      phone: phone != null ? phone : (src ? src.phone : ""),
       pickup_time: nowStr(),
       pcs: pcs,
       cancel_pcs: 0,
