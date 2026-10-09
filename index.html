@@ -1251,6 +1251,7 @@ function PickupModal({
   const [sigData, setSigData] = useState(null);
   const [showPhoto, setShowPhoto] = useState(false);
   const [photoUrl, setPhotoUrl] = useState(null);
+  const [shuWang, setShuWang] = useState("");
   const inp = {
     width: "100%",
     background: C.grayLight,
@@ -1372,7 +1373,8 @@ function PickupModal({
       address,
       remark,
       sigData,
-      photoUrl
+      photoUrl,
+      shuWang
     }),
     style: {
       width: "100%",
@@ -1502,6 +1504,48 @@ function PickupModal({
       marginBottom: 16
     }
   }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.blueSoft,
+      border: `1.5px dashed ${C.blue}`,
+      borderRadius: 12,
+      padding: "11px 13px",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 800,
+      color: C.text,
+      marginBottom: 7
+    }
+  }, "➕ 這批還有「數網」的貨嗎？"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    inputMode: "numeric",
+    min: "0",
+    value: shuWang,
+    onChange: e => {
+      const v = e.target.value;
+      setShuWang(v === "" ? "" : Math.max(0, parseInt(v, 10) || 0));
+    },
+    placeholder: "0",
+    style: { ...inp,
+      width: 86,
+      textAlign: "center",
+      fontWeight: 800,
+      fontSize: 18
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: C.textSub
+    }
+  }, "件數網（沒有就留空）"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -2277,7 +2321,7 @@ function CaseCard({
       action: onReject
     }].filter(Boolean), c.is_pre && onDelete ? [{
       icon: "🗑️",
-      label: "刪除此筆 PRE",
+      label: "刪除此筆 數網",
       color: C.red,
       action: onDelete
     }] : [])
@@ -3879,8 +3923,10 @@ function MainApp({
     address,
     remark,
     sigData,
-    photoUrl
+    photoUrl,
+    shuWang
   }) => {
+    const src = cases.find(c => c.id === pickupModal);
     setCases(cs => cs.map(c => c.id === pickupModal ? {
       ...c,
       status: "已取件",
@@ -3891,6 +3937,8 @@ function MainApp({
       sig_url: sigData || null,
       photo_url: photoUrl || null
     } : c));
+    const sw = Number(shuWang);
+    if (sw > 0) addShuWang(src, sw);
     setPickupModal(null);
   };
   const handleUndo = id => setCases(cs => cs.map(c => c.id === id ? {
@@ -3899,34 +3947,27 @@ function MainApp({
     pickup_at: null
   } : c));
   const handleDeleteCase = id => {
-    if (!window.confirm("確定要刪除這筆 PRE 加收案件嗎？刪除後無法復原。")) return;
+    if (!window.confirm("確定要刪除這筆「數網」案件嗎？刪除後無法復原。")) return;
     setCases(cs => cs.filter(c => c.id !== id));
   };
-  const handlePreAdd = ({
-    source,
-    address,
-    phone,
-    code,
-    pcs,
-    remark
-  }) => {
-    const id = "PRE-" + Date.now().toString().slice(-6);
+  const addShuWang = (src, pcs) => {
+    const id = "SW-" + Date.now().toString().slice(-6);
     setCases(cs => [...cs, {
       id,
       status: "已取件",
       driver_id: me,
-      customer: "PRE",
-      pre_code: code || "PRE",
+      customer: "數網",
+      pre_code: "數網",
       is_pre: true,
-      source_customer: source || "",
-      name: source || "",
-      address: address || "",
-      phone: phone || "",
+      source_customer: src ? src.customer : "",
+      name: src ? src.customer : "",
+      address: src ? src.address : "",
+      phone: src ? src.phone : "",
       pickup_time: nowStr(),
       pcs: pcs,
       cancel_pcs: 0,
       pcs_actual: pcs,
-      remark: remark || "",
+      remark: "",
       assigned_at: nowStr(),
       pickup_at: nowStr(),
       order: 999,
@@ -3935,7 +3976,6 @@ function MainApp({
       sig_url: null,
       photo_url: null
     }]);
-    setPreAddModal(false);
   };
   const handleCancelPickup = (id, note) => {
     setCases(cs => cs.map(c => c.id === id ? {
@@ -4239,7 +4279,6 @@ function MainApp({
     onEmptyTrip: id => setEmptyTripModal(id),
     onReorder: handleReorder,
     onSession: handleSession,
-    onPreAdd: () => setPreAddModal(true),
     onDelete: handleDeleteCase
   }), isCaptain && tab === 1 && /*#__PURE__*/React.createElement(TeamTab, {
     cases: cases,
@@ -4356,10 +4395,6 @@ function MainApp({
       }));
       setDepartModal(false);
     }
-  }), preAddModal && /*#__PURE__*/React.createElement(PreAddModal, {
-    myCases: cases.filter(c => c.driver_id === me),
-    onClose: () => setPreAddModal(false),
-    onSubmit: handlePreAdd
   }));
 }
 
@@ -5898,45 +5933,62 @@ function App() {
     });
   }
 
-  // 客戶帳號：直接進新增取件需求畫面，不用選車、不用看派件
+  // 客戶帳號：線上下單暫時關閉
   if (account.role === "customer") {
-    const myCases = cases.filter(c => c.customer_login === account.code);
-    return /*#__PURE__*/React.createElement(AddCaseScreen, {
-      customerName: account.name,
-      memberCode: account.memberCode,
-      defaults: {
-        address: account.address || "",
-        phone: account.phone || "",
-        contact: account.contact || ""
-      },
-      myCases: myCases,
-      onLogout: () => setAccount(null),
-      onSubmit: form => {
-        const newId = "GMP-" + Date.now().toString().slice(-6);
-        setCases(cs => [...cs, {
-          id: newId,
-          status: "待指派",
-          driver_id: null,
-          customer: `${account.memberCode}-${form.member}`,
-          customer_login: account.code,
-          name: form.contact,
-          address: form.address,
-          phone: form.phone,
-          pickup_date: form.pickupDate,
-          pickup_time: form.pickupTime,
-          pcs: Number(form.pcs) || 1,
-          cancel_pcs: 0,
-          pcs_actual: null,
-          remark: form.remark,
-          assigned_at: null,
-          order: cs.length,
-          wait_min: 0,
-          session: null,
-          sig_url: null,
-          photo_url: null
-        }]);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        minHeight: "100vh",
+        background: `linear-gradient(160deg,${C.navy} 0%,${C.blue} 55%,${C.blueMid} 100%)`,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        fontFamily: "'Inter','Noto Sans TC',system-ui,sans-serif",
+        textAlign: "center"
       }
-    });
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.white,
+        borderRadius: 20,
+        padding: 28,
+        width: "100%",
+        maxWidth: 340,
+        boxShadow: "0 8px 32px rgba(0,0,0,0.2)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 40,
+        marginBottom: 12
+      }
+    }, "🚧"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 900,
+        fontSize: 18,
+        color: C.text,
+        marginBottom: 8
+      }
+    }, "線上下單暫停中"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 14,
+        color: C.textSub,
+        lineHeight: 1.7,
+        marginBottom: 20
+      }
+    }, "目前暫停透過 App 線上下單，請改用原本的方式叫件，造成不便敬請見諒。"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setAccount(null),
+      style: {
+        width: "100%",
+        background: C.grayLight,
+        border: `1.5px solid ${C.grayBorder}`,
+        borderRadius: 12,
+        padding: 13,
+        color: C.textSub,
+        fontSize: 14,
+        fontWeight: 700,
+        cursor: "pointer"
+      }
+    }, "登出")));
   }
   // 司機／隊長：登入後直接進入案件畫面，出發登記（車牌／里程）改由畫面上的按鈕觸發
   return /*#__PURE__*/React.createElement(MainApp, {
