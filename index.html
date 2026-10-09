@@ -1252,6 +1252,9 @@ function PickupModal({
   const [showPhoto, setShowPhoto] = useState(false);
   const [photoUrl, setPhotoUrl] = useState(null);
   const [shuWang, setShuWang] = useState("");
+  const [phone, setPhone] = useState(c.phone);
+  const [showEdit, setShowEdit] = useState(false);
+  const [showSW, setShowSW] = useState(false);
   const inp = {
     width: "100%",
     background: C.grayLight,
@@ -1372,6 +1375,7 @@ function PickupModal({
       pcs,
       address,
       remark,
+      phone,
       sigData,
       photoUrl,
       shuWang
@@ -1436,14 +1440,14 @@ function PickupModal({
       color: C.text,
       marginBottom: 12
     }
-  }, "確認取件・", c.customer, " ", c.name), /*#__PURE__*/React.createElement("div", {
+  }, "確認取件・", c.customer), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: C.textSub,
       fontWeight: 600,
       marginBottom: 6
     }
-  }, "實際取件數（可直接輸入）"), /*#__PURE__*/React.createElement("div", {
+  }, "實際件數"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -1485,67 +1489,111 @@ function PickupModal({
       color: C.orange,
       marginBottom: 14
     }
-  }, "⚠️ 與原始件數 ", net(c), " 件不符"), /*#__PURE__*/React.createElement("input", {
-    value: address,
-    onChange: e => setAddress(e.target.value),
+  }, "⚠️ 與原始件數 ", net(c), " 件不符"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowEdit(s => !s),
     style: {
-      ...inp,
-      marginBottom: 12
-    },
-    placeholder: "取件地址（如有修正）"
-  }), /*#__PURE__*/React.createElement("textarea", {
-    value: remark,
-    onChange: e => setRemark(e.target.value),
-    placeholder: "備註",
-    style: {
-      ...inp,
-      height: 64,
-      resize: "none",
-      marginBottom: 16
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.blueSoft,
-      border: `1.5px dashed ${C.blue}`,
+      width: "100%",
+      background: showEdit ? C.blueSoft : C.grayLight,
+      border: `1.5px solid ${showEdit ? C.blue : C.grayBorder}`,
       borderRadius: 12,
-      padding: "11px 13px",
-      marginBottom: 16
+      padding: "11px",
+      color: showEdit ? C.blue : C.textSub,
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      marginBottom: showEdit ? 10 : 12
+    }
+  }, showEdit ? "✏️ 資料異動（點收起）" : "✏️ 資料異動"), showEdit && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 13,
-      fontWeight: 800,
-      color: C.text,
-      marginBottom: 7
+      fontSize: 12,
+      color: C.textSub,
+      fontWeight: 600,
+      marginBottom: 5
     }
-  }, "➕ 這批還有「數網」的貨嗎？"), /*#__PURE__*/React.createElement("div", {
+  }, "這次取件狀況／備註（給之後的司機參考）"), /*#__PURE__*/React.createElement("textarea", {
+    value: remark,
+    onChange: e => setRemark(e.target.value),
+    placeholder: "例如：大門走後巷、需提前電話、客戶常臨時加件…",
+    style: { ...inp,
+      height: 64,
+      resize: "none",
+      marginBottom: 10
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.textSub,
+      fontWeight: 600,
+      marginBottom: 5
+    }
+  }, "地址（如需修改）"), /*#__PURE__*/React.createElement("input", {
+    value: address,
+    onChange: e => setAddress(e.target.value),
+    placeholder: "取件地址",
+    style: { ...inp,
+      marginBottom: 10
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.textSub,
+      fontWeight: 600,
+      marginBottom: 5
+    }
+  }, "電話（如需修改）"), /*#__PURE__*/React.createElement("input", {
+    value: phone,
+    onChange: e => setPhone(e.target.value),
+    placeholder: "聯絡電話",
+    style: inp
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
-      gap: 10
+      gap: 10,
+      marginBottom: 16
     }
-  }, /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowSW(s => {
+      if (s) setShuWang("");
+      return !s;
+    }),
+    style: {
+      background: showSW ? C.blueSoft : C.grayLight,
+      border: `1.5px solid ${showSW ? C.blue : C.grayBorder}`,
+      borderRadius: 12,
+      padding: "10px 14px",
+      color: showSW ? C.blue : C.textSub,
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      whiteSpace: "nowrap"
+    }
+  }, showSW ? "數網件數：" : "➕ 新增數網"), showSW && /*#__PURE__*/React.createElement("input", {
     type: "number",
     inputMode: "numeric",
-    min: "0",
+    min: "1",
     value: shuWang,
     onChange: e => {
       const v = e.target.value;
       setShuWang(v === "" ? "" : Math.max(0, parseInt(v, 10) || 0));
     },
-    placeholder: "0",
+    placeholder: "件數",
     style: { ...inp,
-      width: 86,
+      width: 90,
       textAlign: "center",
       fontWeight: 800,
-      fontSize: 18
+      fontSize: 17
     }
-  }), /*#__PURE__*/React.createElement("span", {
+  }), showSW && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 13,
       color: C.textSub
     }
-  }, "件數網（沒有就留空）"))), /*#__PURE__*/React.createElement("div", {
+  }, "件")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -1571,7 +1619,7 @@ function PickupModal({
       justifyContent: "center",
       gap: 5
     }
-  }, sigData ? "✍️ 已簽收 ✓" : "✍️ 需要簽收"), /*#__PURE__*/React.createElement("button", {
+  }, sigData ? "✍️ 已簽收 ✓" : "✍️ 簽收"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setShowPhoto(s => !s);
       if (showPhoto) setPhotoUrl(null);
@@ -1591,7 +1639,7 @@ function PickupModal({
       justifyContent: "center",
       gap: 5
     }
-  }, photoUrl ? "📷 已拍照 ✓" : "📷 需要拍照")), sigData && /*#__PURE__*/React.createElement("div", {
+  }, photoUrl ? "📷 已拍照 ✓" : "📷 拍照")), sigData && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 16,
       background: C.blueSoft,
@@ -3922,6 +3970,7 @@ function MainApp({
     pcs,
     address,
     remark,
+    phone,
     sigData,
     photoUrl,
     shuWang
@@ -3933,6 +3982,7 @@ function MainApp({
       pcs_actual: pcs,
       address,
       remark,
+      phone,
       pickup_at: nowStr(),
       sig_url: sigData || null,
       photo_url: photoUrl || null
