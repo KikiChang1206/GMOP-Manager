@@ -2173,7 +2173,7 @@ function CaseCard({
 }) {
   const cfg = STATUS_CFG[c.status] || {};
   const isDone = c.status === "已取件";
-  const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapAddr(c.address)}`;
+  const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(c.address || "")}`;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.white,
@@ -2598,7 +2598,7 @@ function MyCasesTab({
   onEmptyTrip,
   onReorder,
   onSession,
-  onPreAdd,
+  onManualAdd,
   onDelete
 }) {
   const [section, setSection] = useState(0);
@@ -2699,21 +2699,22 @@ function MyCasesTab({
     style: {
       padding: "14px 12px 80px"
     }
-  }, onPreAdd && /*#__PURE__*/React.createElement("button", {
-    onClick: onPreAdd,
+  }, section === 0 && onManualAdd && /*#__PURE__*/React.createElement("button", {
+    onClick: onManualAdd,
     style: {
       width: "100%",
       marginBottom: 12,
-      background: C.white,
-      border: `1.5px dashed ${C.blue}`,
+      background: `linear-gradient(135deg,${C.blue},${C.blueMid})`,
+      border: "none",
       borderRadius: 12,
-      padding: "11px",
-      color: C.blue,
-      fontSize: 13,
+      padding: "12px",
+      color: C.white,
+      fontSize: 14,
       fontWeight: 800,
-      cursor: "pointer"
+      cursor: "pointer",
+      boxShadow: C.shadowBlue
     }
-  }, "➕ 加收 PRE 件數（另計）"), section === 1 && cur.cases.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "➕ 臨時新增案件"), section === 1 && cur.cases.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -3879,6 +3880,186 @@ function PreAddModal({
   }, "取消")));
 }
 
+// ── 臨時新增案件（司機手動建立）──────────────────────────
+function ManualAddModal({
+  onClose,
+  onSubmit
+}) {
+  const [customer, setCustomer] = useState("");
+  const [address, setAddress] = useState("");
+  const [phone, setPhone] = useState("");
+  const [pcs, setPcs] = useState(1);
+  const [time, setTime] = useState("");
+  const [remark, setRemark] = useState("");
+  const can = customer.trim() !== "" && Number(pcs) > 0;
+  const lbl = {
+    fontSize: 12,
+    color: C.textSub,
+    fontWeight: 600,
+    marginBottom: 5,
+    marginTop: 12
+  };
+  const inp = {
+    width: "100%",
+    background: C.grayLight,
+    border: `1.5px solid ${C.grayBorder}`,
+    borderRadius: 12,
+    padding: "12px 14px",
+    color: C.text,
+    fontSize: 15,
+    boxSizing: "border-box",
+    outline: "none",
+    fontFamily: "inherit"
+  };
+  const submit = () => {
+    if (!can) return;
+    onSubmit({
+      customer: customer.trim(),
+      address: address.trim(),
+      phone: phone.trim(),
+      pcs: Number(pcs),
+      time: time.trim(),
+      remark: remark.trim()
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(20,40,80,0.5)",
+      zIndex: 200,
+      display: "flex",
+      alignItems: "flex-end"
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.white,
+      borderRadius: "22px 22px 0 0",
+      width: "100%",
+      padding: "20px 20px 44px",
+      maxHeight: "92vh",
+      overflowY: "auto"
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 40,
+      height: 5,
+      background: C.grayBorder,
+      borderRadius: 3,
+      margin: "0 auto 16px"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 16,
+      color: C.text,
+      marginBottom: 2
+    }
+  }, "➕ 臨時新增案件"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.textSub,
+      marginBottom: 4
+    }
+  }, "現場臨時的取件，手動建一筆到你的待取件"), /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "客戶名稱 *"), /*#__PURE__*/React.createElement("input", {
+    value: customer,
+    onChange: e => setCustomer(e.target.value),
+    placeholder: "例：太子天一有限公司",
+    style: inp
+  }), /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "地址"), /*#__PURE__*/React.createElement("input", {
+    value: address,
+    onChange: e => setAddress(e.target.value),
+    placeholder: "取件地址",
+    style: inp
+  }), /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "電話"), /*#__PURE__*/React.createElement("input", {
+    value: phone,
+    onChange: e => setPhone(e.target.value),
+    placeholder: "聯絡電話",
+    style: inp
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "件數"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    inputMode: "numeric",
+    min: "1",
+    value: pcs,
+    onChange: e => {
+      const v = e.target.value;
+      setPcs(v === "" ? "" : Math.max(0, parseInt(v, 10) || 0));
+    },
+    style: { ...inp,
+      textAlign: "center",
+      fontWeight: 800
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "取件時間"), /*#__PURE__*/React.createElement("input", {
+    value: time,
+    onChange: e => setTime(e.target.value),
+    placeholder: "例：14:00",
+    style: inp
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: lbl
+  }, "備註"), /*#__PURE__*/React.createElement("textarea", {
+    value: remark,
+    onChange: e => setRemark(e.target.value),
+    rows: 2,
+    placeholder: "補充說明（可留空）",
+    style: { ...inp,
+      resize: "none"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    disabled: !can,
+    style: {
+      width: "100%",
+      marginTop: 18,
+      background: can ? `linear-gradient(135deg,${C.blue},${C.blueMid})` : C.grayBorder,
+      border: "none",
+      borderRadius: 14,
+      padding: 15,
+      color: C.white,
+      fontSize: 16,
+      fontWeight: 800,
+      cursor: can ? "pointer" : "default"
+    }
+  }, "新增到待取件"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      width: "100%",
+      marginTop: 10,
+      background: "transparent",
+      border: `1.5px solid ${C.grayBorder}`,
+      borderRadius: 14,
+      padding: 13,
+      color: C.textSub,
+      fontSize: 14,
+      cursor: "pointer"
+    }
+  }, "取消")));
+}
+
 function MainApp({
   me,
   meName,
@@ -3900,7 +4081,7 @@ function MainApp({
   const [pickupModal, setPickupModal] = useState(null);
   const [rejectModal, setRejectModal] = useState(null);
   const [emptyTripModal, setEmptyTripModal] = useState(null);
-  const [preAddModal, setPreAddModal] = useState(false);
+  const [manualAddModal, setManualAddModal] = useState(false);
   const [assignTarget, setAssignTarget] = useState(null);
   const [tripEndModal, setTripEndModal] = useState(false);
   const tripReport = myTrip.report || null;
@@ -3993,6 +4174,39 @@ function MainApp({
       sig_url: null,
       photo_url: null
     }]);
+  };
+  const handleManualAdd = ({
+    customer,
+    address,
+    phone,
+    pcs,
+    time,
+    remark
+  }) => {
+    const id = "M-" + Date.now().toString().slice(-6);
+    setCases(cs => [...cs, {
+      id,
+      status: "待取件",
+      driver_id: me,
+      customer: customer,
+      name: "",
+      address: address || "",
+      phone: phone || "",
+      pickup_date: todayStr(),
+      pickup_time: time || "",
+      pcs: Number(pcs) || 1,
+      cancel_pcs: 0,
+      pcs_actual: null,
+      remark: remark || "",
+      assigned_at: nowStr(),
+      order: 999,
+      wait_min: 0,
+      manual: true,
+      session: null,
+      sig_url: null,
+      photo_url: null
+    }]);
+    setManualAddModal(false);
   };
   const handleCancelPickup = (id, note) => {
     setCases(cs => cs.map(c => c.id === id ? {
@@ -4296,6 +4510,7 @@ function MainApp({
     onEmptyTrip: id => setEmptyTripModal(id),
     onReorder: handleReorder,
     onSession: handleSession,
+    onManualAdd: () => setManualAddModal(true),
     onDelete: handleDeleteCase
   }), isCaptain && tab === 1 && /*#__PURE__*/React.createElement(TeamTab, {
     cases: cases,
@@ -4412,6 +4627,9 @@ function MainApp({
       }));
       setDepartModal(false);
     }
+  }), manualAddModal && /*#__PURE__*/React.createElement(ManualAddModal, {
+    onClose: () => setManualAddModal(false),
+    onSubmit: handleManualAdd
   }));
 }
 
