@@ -2333,7 +2333,7 @@ function CaseCard({
       color: C.text,
       lineHeight: 1.2
     }
-  }, c.customer), /*#__PURE__*/React.createElement("div", {
+  }, c.customer), !isDone && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       color: C.textSub,
@@ -2355,22 +2355,22 @@ function CaseCard({
       action: onReject
     }] : c.status === "已取件" ? [{
       icon: "↩️",
-      label: "撤銷結案",
+      label: "退回待取",
       color: C.orange,
       action: onUndo
     }] : [onEmptyTrip && {
       icon: "🚫",
-      label: "跑空趟／沒收貨",
+      label: "空趟",
       color: C.red,
       action: onEmptyTrip
     }, {
       icon: "↩️",
-      label: "退回給隊長",
+      label: "退回",
       color: C.orange,
       action: onReject
-    }].filter(Boolean), c.is_pre && onDelete ? [{
+    }].filter(Boolean), c.status === "已取件" && onDelete ? [{
       icon: "🗑️",
-      label: "刪除此筆 數網",
+      label: "刪除",
       color: C.red,
       action: onDelete
     }] : [])
@@ -2513,7 +2513,7 @@ function CaseCard({
       fontSize: 13,
       fontWeight: 700
     }
-  }, "📝 本次有修改資料"), (c.sig_url || c.photo_url) && /*#__PURE__*/React.createElement("div", {
+  }, "📝 資料異動"), (c.sig_url || c.photo_url) && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8
@@ -3963,7 +3963,7 @@ function MainApp({
     pickup_at: null
   } : c));
   const handleDeleteCase = id => {
-    if (!window.confirm("確定要刪除這筆「數網」案件嗎？刪除後無法復原。")) return;
+    if (!window.confirm("確定要刪除這筆案件嗎？刪除後無法復原。")) return;
     setCases(cs => cs.filter(c => c.id !== id));
   };
   const addShuWang = (src, pcs, addr, phone) => {
