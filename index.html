@@ -2181,7 +2181,7 @@ function CaseCard({
       marginBottom: 12,
       boxShadow: isDragging ? "0 6px 20px rgba(43,123,232,0.3)" : C.shadow,
       border: `1.5px solid ${isDragging ? C.blue : C.grayBorder}`,
-      overflow: "hidden",
+      overflow: "visible",
       transform: isDragging ? "scale(1.02)" : "none",
       transition: isDragging ? "none" : "transform 0.15s, box-shadow 0.15s",
       opacity: isDragging ? 0.9 : 1
@@ -2189,6 +2189,7 @@ function CaseCard({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       height: 4,
+      borderRadius: "18px 18px 0 0",
       background: `linear-gradient(90deg,${cfg.color},${cfg.color}55)`
     }
   }), /*#__PURE__*/React.createElement("div", {
@@ -3972,7 +3973,7 @@ function MainApp({
       id,
       status: "已取件",
       driver_id: me,
-      customer: "A" + (src ? src.customer : ""),
+      customer: "A-" + (src ? src.customer : ""),
       pre_code: "數網",
       is_pre: true,
       source_customer: src ? src.customer : "",
