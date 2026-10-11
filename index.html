@@ -2946,7 +2946,24 @@ function MyCasesTab({
       color: C.textMuted,
       marginTop: 6
     }
-  }, "依你要去的順序，一張一張點"), sortMethod === "drag" && /*#__PURE__*/React.createElement("div", {
+  }, "依你要去的順序，一張一張點"), sortMethod === "drag" && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const ids = [...cur.cases].sort((x, y) => (x.pickup_time || "").localeCompare(y.pickup_time || "")).map(c => c.id);
+      applyOrder(ids);
+    },
+    style: {
+      width: "100%",
+      marginTop: 8,
+      background: C.grayLight,
+      border: `1.5px solid ${C.grayBorder}`,
+      borderRadius: 10,
+      padding: "10px",
+      color: C.gray,
+      fontSize: 12,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, "🔄 重設（依取件時間）"), sortMethod === "drag" && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: C.textMuted,
