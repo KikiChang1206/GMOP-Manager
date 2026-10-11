@@ -6156,11 +6156,18 @@ function AdminScreen({
   setAccounts,
   cases,
   setCases,
+  setTrips,
   onLogout
 }) {
   const [tab, setTab] = useState("team");
   const [assignTarget, setAssignTarget] = useState(null);
   const [rejectModal, setRejectModal] = useState(null);
+  const handleResetData = () => {
+    if (!window.confirm("確定要把所有案件還原成範例資料嗎？\n測試新增的案件會全部清除、車牌里程也會清空，帳號不受影響。此動作無法復原。")) return;
+    setCases(initCases);
+    if (setTrips) setTrips({});
+    window.alert("已還原成範例資料 ✅");
+  };
   const handleSession = (id, session) => setCases(cs => cs.map(c => c.id === id ? {
     ...c,
     session
@@ -6282,10 +6289,36 @@ function AdminScreen({
     onAssign: setAssignTarget,
     onSession: handleSession
   }),
-  tab === "accounts" && /*#__PURE__*/React.createElement(AccountsAdmin, {
+  tab === "accounts" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AccountsAdmin, {
     accounts: accounts,
     setAccounts: setAccounts
-  }),
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 20px 110px",
+      maxWidth: 430,
+      margin: "0 auto"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleResetData,
+    style: {
+      width: "100%",
+      background: "transparent",
+      border: `1.5px solid ${C.red}`,
+      borderRadius: 12,
+      padding: 13,
+      color: C.red,
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, "🔄 重設案件為範例資料（清除測試）"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.textMuted,
+      marginTop: 8,
+      textAlign: "center"
+    }
+  }, "會清掉所有測試案件、還原成範例，帳號不受影響"))),
   /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -6385,6 +6418,7 @@ function App() {
       setAccounts: setAccounts,
       cases: cases,
       setCases: setCases,
+      setTrips: setTrips,
       onLogout: () => setAccount(null)
     });
   }
