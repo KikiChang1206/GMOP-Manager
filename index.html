@@ -2928,7 +2928,11 @@ function MyCasesTab({
       cursor: pickedB.length ? "pointer" : "default"
     }
   }, "✅ 套用順序 (" + pickedB.length + "/" + cur.cases.length + ")"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setPickedB([]),
+    onClick: () => {
+      setPickedB([]);
+      const ids = [...cur.cases].sort((x, y) => (x.pickup_time || "").localeCompare(y.pickup_time || "")).map(c => c.id);
+      applyOrder(ids);
+    },
     style: {
       flex: 1,
       background: C.grayLight,
@@ -2936,11 +2940,11 @@ function MyCasesTab({
       borderRadius: 10,
       padding: "10px",
       color: C.gray,
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: 700,
       cursor: "pointer"
     }
-  }, "重設")), sortMethod === "B" && /*#__PURE__*/React.createElement("div", {
+  }, "🔄 重設（依取件時間）")), sortMethod === "B" && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: C.textMuted,
