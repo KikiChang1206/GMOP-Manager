@@ -2608,6 +2608,7 @@ function MyCasesTab({
   const [sortMode, setSortMode] = useState(false);
   const [sortMethod, setSortMethod] = useState("drag");
   const [pickedB, setPickedB] = useState([]);
+  const [bApplied, setBApplied] = useState(false);
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
   const listRef = useRef(null);
@@ -2683,7 +2684,10 @@ function MyCasesTab({
     ids.splice(p, 0, id);
     applyOrder(ids);
   };
-  const toggleB = id => setPickedB(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleB = id => {
+    setBApplied(false);
+    setPickedB(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
   const applyB = () => {
     const rest = cur.cases.map(c => c.id).filter(id => !pickedB.includes(id));
     applyOrder([...pickedB, ...rest]);
@@ -2822,26 +2826,46 @@ function MyCasesTab({
       cursor: "pointer",
       boxShadow: C.shadowBlue
     }
-  }, "➕ 臨時新增案件"), section === 1 && cur.cases.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "➕ 新增案件"), section === 1 && cur.cases.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
       marginBottom: 12
     }
-  }, cur.cases.length > 1 && /*#__PURE__*/React.createElement("button", {
-    onClick: () => setSortMode(m => !m),
-    style: {
-      flex: 1,
-      background: sortMode ? C.blue : C.grayLight,
-      border: `1.5px solid ${sortMode ? C.blue : C.grayBorder}`,
-      borderRadius: 10,
-      padding: "10px 6px",
-      color: sortMode ? C.white : C.gray,
-      fontSize: 12,
-      fontWeight: 700,
-      cursor: "pointer"
-    }
-  }, sortMode ? "✅ 完成排序" : "⇅ 排順序"), !sortMode && (() => {
+  }, cur.cases.length > 1 && (() => {
+    const applyPhase = sortMode && sortMethod === "B" && !bApplied;
+    const applyActive = applyPhase && pickedB.length > 0;
+    const label = !sortMode ? "⇅ 排順序" : applyPhase ? "✅ 套用順序 (" + pickedB.length + "/" + cur.cases.length + ")" : "✅ 完成排序";
+    return /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        if (!sortMode) {
+          setSortMode(true);
+          return;
+        }
+        if (applyPhase) {
+          if (pickedB.length > 0) {
+            applyB();
+            setBApplied(true);
+          }
+          return;
+        }
+        setSortMode(false);
+        setBApplied(false);
+        setPickedB([]);
+      },
+      style: {
+        flex: 1,
+        background: applyActive ? `linear-gradient(135deg,${C.green},#27855A)` : sortMode && !applyPhase ? C.blue : C.grayLight,
+        border: `1.5px solid ${applyActive ? C.green : sortMode && !applyPhase ? C.blue : C.grayBorder}`,
+        borderRadius: 10,
+        padding: "10px 6px",
+        color: applyActive || sortMode && !applyPhase ? C.white : C.gray,
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: "pointer"
+      }
+    }, label);
+  })(), !sortMode && (() => {
     const addrs = cur.cases.map(c => c.address);
     const destination = mapAddr(navAddr(addrs[addrs.length - 1]));
     const waypoints = addrs.slice(0, -1).map(a => mapAddr(navAddr(a))).join("|");
@@ -2877,11 +2901,12 @@ function MyCasesTab({
       gap: 8,
       marginBottom: 8
     }
-  }, [["drag", "✋ 拖拉排序"], ["B", "👆 點選順序"]].map(m => /*#__PURE__*/React.createElement("button", {
+  }, [["drag", "✋ 拖拉排序"], ["B", "👆 點選排序"]].map(m => /*#__PURE__*/React.createElement("button", {
     key: m[0],
     onClick: () => {
       setSortMethod(m[0]);
       setPickedB([]);
+      setBApplied(false);
     },
     style: {
       flex: 1,
@@ -2894,42 +2919,33 @@ function MyCasesTab({
       fontWeight: 700,
       cursor: "pointer"
     }
-  }, m[1]))), /*#__PURE__*/React.createElement("button", {
-    onClick: doAreaSort,
-    style: {
-      width: "100%",
-      background: C.orangeLight,
-      border: `1.5px solid ${C.orange}`,
-      borderRadius: 10,
-      padding: "9px",
-      color: C.orange,
-      fontSize: 12,
-      fontWeight: 800,
-      cursor: "pointer"
-    }
-  }, "📍 依地區自動排序"), sortMethod === "B" && /*#__PURE__*/React.createElement("div", {
+  }, m[1]))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
       marginTop: 8
     }
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: applyB,
-    disabled: pickedB.length === 0,
-    style: {
-      flex: 2,
-      background: pickedB.length ? `linear-gradient(135deg,${C.green},#27855A)` : C.grayLight,
-      border: "none",
-      borderRadius: 10,
-      padding: "10px",
-      color: pickedB.length ? C.white : C.textMuted,
-      fontSize: 12,
-      fontWeight: 800,
-      cursor: pickedB.length ? "pointer" : "default"
-    }
-  }, "✅ 套用順序 (" + pickedB.length + "/" + cur.cases.length + ")"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setPickedB([]);
+      setBApplied(true);
+      doAreaSort();
+    },
+    style: {
+      flex: 1,
+      background: C.orangeLight,
+      border: `1.5px solid ${C.orange}`,
+      borderRadius: 10,
+      padding: "10px 6px",
+      color: C.orange,
+      fontSize: 12,
+      fontWeight: 800,
+      cursor: "pointer"
+    }
+  }, "📍 依地區"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setPickedB([]);
+      setBApplied(true);
       const ids = [...cur.cases].sort((x, y) => (x.pickup_time || "").localeCompare(y.pickup_time || "")).map(c => c.id);
       applyOrder(ids);
     },
@@ -2938,36 +2954,19 @@ function MyCasesTab({
       background: C.grayLight,
       border: `1.5px solid ${C.grayBorder}`,
       borderRadius: 10,
-      padding: "10px",
-      color: C.gray,
-      fontSize: 11,
-      fontWeight: 700,
-      cursor: "pointer"
-    }
-  }, "🔄 重設（依取件時間）")), sortMethod === "B" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.textMuted,
-      marginTop: 6
-    }
-  }, "依你要去的順序，一張一張點"), sortMethod === "drag" && /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      const ids = [...cur.cases].sort((x, y) => (x.pickup_time || "").localeCompare(y.pickup_time || "")).map(c => c.id);
-      applyOrder(ids);
-    },
-    style: {
-      width: "100%",
-      marginTop: 8,
-      background: C.grayLight,
-      border: `1.5px solid ${C.grayBorder}`,
-      borderRadius: 10,
-      padding: "10px",
+      padding: "10px 6px",
       color: C.gray,
       fontSize: 12,
       fontWeight: 700,
       cursor: "pointer"
     }
-  }, "🔄 重設（依取件時間）"), sortMethod === "drag" && /*#__PURE__*/React.createElement("div", {
+  }, "🔄 依時間")), sortMethod === "B" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.textMuted,
+      marginTop: 6
+    }
+  }, "依你要去的順序，一張一張點，排完按上方「套用順序」"), sortMethod === "drag" && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: C.textMuted,
@@ -4098,6 +4097,8 @@ function ManualAddModal({
   const [pcs, setPcs] = useState(1);
   const [time, setTime] = useState("");
   const [remark, setRemark] = useState("");
+  const [isSW, setIsSW] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const can = customer.trim() !== "" && Number(pcs) > 0;
   const lbl = {
     fontSize: 12,
@@ -4126,7 +4127,8 @@ function ManualAddModal({
       phone: phone.trim(),
       pcs: Number(pcs),
       time: time.trim(),
-      remark: remark.trim()
+      remark: remark.trim(),
+      sw: isSW
     });
   };
   return /*#__PURE__*/React.createElement("div", {
@@ -4164,13 +4166,7 @@ function ManualAddModal({
       color: C.text,
       marginBottom: 2
     }
-  }, "➕ 臨時新增案件"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: C.textSub,
-      marginBottom: 4
-    }
-  }, "現場臨時的取件，手動建一筆到你的待取件"), /*#__PURE__*/React.createElement("div", {
+  }, "➕ 新增案件"), /*#__PURE__*/React.createElement("div", {
     style: lbl
   }, "客戶名稱 *"), /*#__PURE__*/React.createElement("input", {
     value: customer,
@@ -4178,6 +4174,54 @@ function ManualAddModal({
     placeholder: "例：太子天一有限公司",
     style: inp
   }), /*#__PURE__*/React.createElement("div", {
+    onClick: () => setIsSW(v => !v),
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginTop: 12,
+      padding: "11px 14px",
+      borderRadius: 12,
+      cursor: "pointer",
+      background: isSW ? C.orangeLight : C.grayLight,
+      border: `1.5px solid ${isSW ? C.orange : C.grayBorder}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 22,
+      height: 22,
+      flexShrink: 0,
+      borderRadius: 6,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 14,
+      fontWeight: 900,
+      color: C.white,
+      background: isSW ? C.orange : "transparent",
+      border: `2px solid ${isSW ? C.orange : C.grayBorder}`
+    }
+  }, isSW ? "✓" : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: isSW ? C.orange : C.textSub
+    }
+  }, "數網（會自動在名稱前加 A-）")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowMore(v => !v),
+    style: {
+      width: "100%",
+      marginTop: 12,
+      background: "transparent",
+      border: `1.5px dashed ${C.grayBorder}`,
+      borderRadius: 12,
+      padding: "10px",
+      color: C.textSub,
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, showMore ? "▲ 收起" : "▼ 填寫更多（地址・電話・件數・時間・備註）"), showMore && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: lbl
   }, "地址（非必填）"), /*#__PURE__*/React.createElement("input", {
     value: address,
@@ -4236,7 +4280,7 @@ function ManualAddModal({
     style: { ...inp,
       resize: "none"
     }
-  }), /*#__PURE__*/React.createElement("button", {
+  })), /*#__PURE__*/React.createElement("button", {
     onClick: submit,
     disabled: !can,
     style: {
@@ -4251,7 +4295,7 @@ function ManualAddModal({
       fontWeight: 800,
       cursor: can ? "pointer" : "default"
     }
-  }, "新增到待取件"), /*#__PURE__*/React.createElement("button", {
+  }, "新增案件"), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     style: {
       width: "100%",
@@ -4389,15 +4433,16 @@ function MainApp({
     phone,
     pcs,
     time,
-    remark
+    remark,
+    sw
   }) => {
     const id = "M-" + Date.now().toString().slice(-6);
-    setCases(cs => [...cs, {
+    const base = {
       id,
-      status: "待取件",
+      status: "已指派",
       driver_id: me,
-      customer: customer,
-      name: "",
+      customer: sw ? "A-" + customer : customer,
+      name: sw ? "數網" : "",
       address: address || "",
       phone: phone || "",
       pickup_date: todayStr(),
@@ -4413,9 +4458,15 @@ function MainApp({
       session: null,
       sig_url: null,
       photo_url: null
-    }]);
+    };
+    if (sw) {
+      base.is_pre = true;
+      base.pre_code = "數網";
+      base.source_customer = customer;
+    }
+    setCases(cs => [...cs, base]);
     setManualAddModal(false);
-    setToast("✅ 已新增：" + customer);
+    setToast("✅ 已新增到新案件：" + (sw ? "A-" : "") + customer);
     setTimeout(() => setToast(""), 2200);
   };
   const handleCancelPickup = (id, note) => {
