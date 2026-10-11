@@ -2606,7 +2606,7 @@ function MyCasesTab({
 }) {
   const [section, setSection] = useState(0);
   const [sortMode, setSortMode] = useState(false);
-  const [sortMethod, setSortMethod] = useState("A");
+  const [sortMethod, setSortMethod] = useState("drag");
   const [pickedB, setPickedB] = useState([]);
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
@@ -2708,30 +2708,7 @@ function MyCasesTab({
       gap: 10,
       cursor: sortMethod === "B" ? "pointer" : "default"
     }
-  }, sortMethod === "A" ? /*#__PURE__*/React.createElement("input", {
-    type: "number",
-    min: "1",
-    inputMode: "numeric",
-    defaultValue: idx + 1,
-    onClick: e => e.stopPropagation(),
-    onKeyDown: e => {
-      if (e.key === "Enter") e.target.blur();
-    },
-    onBlur: e => moveTo(c.id, parseInt(e.target.value, 10)),
-    style: {
-      width: 48,
-      textAlign: "center",
-      fontWeight: 900,
-      fontSize: 16,
-      color: C.blue,
-      background: C.blueSoft,
-      border: `1.5px solid ${C.blueLight}`,
-      borderRadius: 10,
-      padding: "8px 0",
-      outline: "none",
-      fontFamily: "inherit"
-    }
-  }) : /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
       width: 32,
       height: 32,
@@ -2880,7 +2857,7 @@ function MyCasesTab({
       gap: 8,
       marginBottom: 8
     }
-  }, [["A", "✏️ 輸入號碼"], ["B", "👆 點選順序"]].map(m => /*#__PURE__*/React.createElement("button", {
+  }, [["drag", "✋ 拖拉排序"], ["B", "👆 點選順序"]].map(m => /*#__PURE__*/React.createElement("button", {
     key: m[0],
     onClick: () => {
       setSortMethod(m[0]);
@@ -2949,13 +2926,13 @@ function MyCasesTab({
       color: C.textMuted,
       marginTop: 6
     }
-  }, "依你要去的順序，一張一張點"), sortMethod === "A" && /*#__PURE__*/React.createElement("div", {
+  }, "依你要去的順序，一張一張點"), sortMethod === "drag" && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: C.textMuted,
       marginTop: 6
     }
-  }, "點號碼輸入「要排第幾站」即可跳位")), cur.cases.length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, "按住卡片左側 ⣿ 直接拖曳，即可調整站點順序")), cur.cases.length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "60px 20px"
@@ -2972,16 +2949,16 @@ function MyCasesTab({
     }
   }, "目前沒有", cur.label, "案件")), /*#__PURE__*/React.createElement("div", {
     ref: section === 1 ? listRef : null
-  }, sortMode && section === 1 ? renderSortRows() : cur.cases.map((c, idx) => /*#__PURE__*/React.createElement(CaseCard, {
+  }, sortMode && section === 1 && sortMethod === "B" ? renderSortRows() : cur.cases.map((c, idx) => /*#__PURE__*/React.createElement(CaseCard, {
     key: c.id,
     c: c,
     idx: idx,
     total: cur.cases.length,
-    sortMode: sortMode,
+    sortMode: sortMode && sortMethod === "drag",
     isDragging: dragIdx === idx,
-    onDragStart: section === 1 ? handleDragStart(idx) : undefined,
-    onDragMove: section === 1 ? handleDragMove : undefined,
-    onDragEnd: section === 1 ? handleDragEnd : undefined,
+    onDragStart: section === 1 && sortMethod === "drag" ? handleDragStart(idx) : undefined,
+    onDragMove: section === 1 && sortMethod === "drag" ? handleDragMove : undefined,
+    onDragEnd: section === 1 && sortMethod === "drag" ? handleDragEnd : undefined,
     onAccept: () => onAccept(c.id),
     onPickup: () => onPickup(c.id),
     onReject: () => onReject(c.id),
