@@ -2173,7 +2173,7 @@ function CaseCard({
 }) {
   const cfg = STATUS_CFG[c.status] || {};
   const isDone = c.status === "已取件";
-  const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(c.address || "")}`;
+  const navUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address || "")}`;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.white,
@@ -2369,7 +2369,7 @@ function CaseCard({
       label: "退回",
       color: C.orange,
       action: onReject
-    }].filter(Boolean), c.status === "已取件" && onDelete ? [{
+    }].filter(Boolean), (c.status === "已取件" || c.manual) && onDelete ? [{
       icon: "🗑️",
       label: "刪除",
       color: C.red,
@@ -3972,14 +3972,14 @@ function ManualAddModal({
     style: inp
   }), /*#__PURE__*/React.createElement("div", {
     style: lbl
-  }, "地址"), /*#__PURE__*/React.createElement("input", {
+  }, "地址（非必填）"), /*#__PURE__*/React.createElement("input", {
     value: address,
     onChange: e => setAddress(e.target.value),
     placeholder: "取件地址",
     style: inp
   }), /*#__PURE__*/React.createElement("div", {
     style: lbl
-  }, "電話"), /*#__PURE__*/React.createElement("input", {
+  }, "電話（非必填）"), /*#__PURE__*/React.createElement("input", {
     value: phone,
     onChange: e => setPhone(e.target.value),
     placeholder: "聯絡電話",
@@ -4014,14 +4014,14 @@ function ManualAddModal({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: lbl
-  }, "取件時間"), /*#__PURE__*/React.createElement("input", {
+  }, "取件時間（非必填）"), /*#__PURE__*/React.createElement("input", {
     value: time,
     onChange: e => setTime(e.target.value),
     placeholder: "例：14:00",
     style: inp
   }))), /*#__PURE__*/React.createElement("div", {
     style: lbl
-  }, "備註"), /*#__PURE__*/React.createElement("textarea", {
+  }, "備註（非必填）"), /*#__PURE__*/React.createElement("textarea", {
     value: remark,
     onChange: e => setRemark(e.target.value),
     rows: 2,
@@ -4082,6 +4082,7 @@ function MainApp({
   const [rejectModal, setRejectModal] = useState(null);
   const [emptyTripModal, setEmptyTripModal] = useState(null);
   const [manualAddModal, setManualAddModal] = useState(false);
+  const [toast, setToast] = useState("");
   const [assignTarget, setAssignTarget] = useState(null);
   const [tripEndModal, setTripEndModal] = useState(false);
   const tripReport = myTrip.report || null;
@@ -4207,6 +4208,8 @@ function MainApp({
       photo_url: null
     }]);
     setManualAddModal(false);
+    setToast("✅ 已新增：" + customer);
+    setTimeout(() => setToast(""), 2200);
   };
   const handleCancelPickup = (id, note) => {
     setCases(cs => cs.map(c => c.id === id ? {
@@ -4630,7 +4633,24 @@ function MainApp({
   }), manualAddModal && /*#__PURE__*/React.createElement(ManualAddModal, {
     onClose: () => setManualAddModal(false),
     onSubmit: handleManualAdd
-  }));
+  }), toast && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: "calc(env(safe-area-inset-top) + 16px)",
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: C.green,
+      color: C.white,
+      padding: "10px 20px",
+      borderRadius: 999,
+      fontSize: 14,
+      fontWeight: 800,
+      boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+      zIndex: 400,
+      maxWidth: "90%",
+      textAlign: "center"
+    }
+  }, toast));
 }
 
 // ── Accounts ──────────────────────────────────────────────
