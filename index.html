@@ -534,6 +534,8 @@ const net = c => c.pcs - (c.cancel_pcs || 0);
 // Google Maps 有時不會把百分比編碼的中文還原，導致顯示亂碼。
 // 這裡只針對網址保留字元做最小必要編碼，中文字直接保留原樣。
 const mapAddr = str => str.replace(/ /g, "%20").replace(/#/g, "%23").replace(/&/g, "%26").replace(/\+/g, "%2B").replace(/\|/g, "%7C");
+// 導航用：去掉地址尾端的「X樓／地下X」等樓層，避免 Google 把樓層當成地點名稱
+const navAddr = str => (str || "").replace(/\s*(?:\d+|[一二三四五六七八九十兩]+)\s*樓.*$/, "").replace(/\s*(?:B|地下)\s*\d+.*$/i, "").trim();
 
 // 新案件到來的「叮咚」提示音（用 Web Audio API 產生，不需要外部音檔）
 function playDing() {
@@ -2173,7 +2175,7 @@ function CaseCard({
 }) {
   const cfg = STATUS_CFG[c.status] || {};
   const isDone = c.status === "已取件";
-  const navUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address || "")}`;
+  const navUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(navAddr(c.address))}`;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.white,
@@ -2735,8 +2737,8 @@ function MyCasesTab({
     }
   }, sortMode ? "✅ 完成排序" : "⇅ 排順序"), !sortMode && (() => {
     const addrs = cur.cases.map(c => c.address);
-    const destination = mapAddr(addrs[addrs.length - 1]);
-    const waypoints = addrs.slice(0, -1).map(a => mapAddr(a)).join("|");
+    const destination = mapAddr(navAddr(addrs[addrs.length - 1]));
+    const waypoints = addrs.slice(0, -1).map(a => mapAddr(navAddr(a))).join("|");
     const routeUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}` + (waypoints ? `&waypoints=${waypoints}` : "") + "&travelmode=driving";
     return /*#__PURE__*/React.createElement("a", {
       href: routeUrl,
