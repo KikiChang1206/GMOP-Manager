@@ -4500,16 +4500,38 @@ function MainApp({
   } : c));
   const handleAssign = driverId => {
     const ids = assignTarget.map(c => c.id);
-    setCases(cs => cs.map(c => ids.includes(c.id) ? {
-      ...c,
-      status: "已指派",
-      driver_id: driverId,
-      assigned_at: nowStr(),
-      wait_min: 0,
-      returned: false
-    } : c));
+    const toSelf = driverId === me;
+    setCases(cs => {
+      let nextOrder = 0;
+      if (toSelf) {
+        const waiting = cs.filter(c => c.driver_id === me && (c.status === "待取件" || c.status === "已接單"));
+        nextOrder = (waiting.length ? Math.min(...waiting.map(c => c.order ?? 0)) : 0) - 1;
+      }
+      return cs.map(c => {
+        if (!ids.includes(c.id)) return c;
+        if (toSelf) {
+          const o = nextOrder;
+          nextOrder -= 1;
+          return { ...c,
+            status: "已接單",
+            driver_id: me,
+            assigned_at: nowStr(),
+            wait_min: 0,
+            returned: false,
+            order: o
+          };
+        }
+        return { ...c,
+          status: "已指派",
+          driver_id: driverId,
+          assigned_at: nowStr(),
+          wait_min: 0,
+          returned: false
+        };
+      });
+    });
     setAssignTarget(null);
-    setTab(1);
+    setTab(toSelf ? 0 : 1);
   };
   const handleReorder = (driverId, from, to) => {
     const relevant = cases.filter(c => c.driver_id === driverId && (c.status === "待取件" || c.status === "已接單")).sort((a, b) => a.order - b.order);
