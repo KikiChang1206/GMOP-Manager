@@ -2690,6 +2690,7 @@ function MyCasesTab({
     setPickedB([]);
   };
   const renderSortRows = () => /*#__PURE__*/React.createElement("div", {
+    ref: sortMethod === "drag" ? listRef : null,
     style: {
       display: "flex",
       flexDirection: "column",
@@ -2700,15 +2701,34 @@ function MyCasesTab({
     onClick: sortMethod === "B" ? () => toggleB(c.id) : undefined,
     style: {
       background: C.white,
-      border: `1.5px solid ${C.grayBorder}`,
+      border: `1.5px solid ${sortMethod === "drag" && overIdx === idx ? C.blue : C.grayBorder}`,
       borderRadius: 12,
       padding: "10px 12px",
       display: "flex",
       alignItems: "center",
       gap: 10,
-      cursor: sortMethod === "B" ? "pointer" : "default"
+      cursor: sortMethod === "B" ? "pointer" : "default",
+      opacity: sortMethod === "drag" && dragIdx === idx ? 0.5 : 1
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, sortMethod === "drag" && /*#__PURE__*/React.createElement("div", {
+    onTouchStart: handleDragStart(idx),
+    onTouchMove: handleDragMove,
+    onTouchEnd: handleDragEnd,
+    onMouseDown: handleDragStart(idx),
+    onMouseMove: handleDragMove,
+    onMouseUp: handleDragEnd,
+    onMouseLeave: handleDragEnd,
+    style: {
+      flexShrink: 0,
+      cursor: "grab",
+      color: C.textMuted,
+      fontSize: 18,
+      lineHeight: 1,
+      padding: "4px 2px",
+      touchAction: "none",
+      userSelect: "none"
+    }
+  }, "⣿"), /*#__PURE__*/React.createElement("div", {
     style: {
       width: 32,
       height: 32,
@@ -2719,11 +2739,11 @@ function MyCasesTab({
       justifyContent: "center",
       fontWeight: 900,
       fontSize: 15,
-      background: pickedB.includes(c.id) ? C.blue : C.grayLight,
-      color: pickedB.includes(c.id) ? C.white : C.gray,
-      border: `1.5px solid ${pickedB.includes(c.id) ? C.blue : C.grayBorder}`
+      background: sortMethod === "drag" ? C.blue : pickedB.includes(c.id) ? C.blue : C.grayLight,
+      color: sortMethod === "drag" ? C.white : pickedB.includes(c.id) ? C.white : C.gray,
+      border: `1.5px solid ${sortMethod === "drag" || pickedB.includes(c.id) ? C.blue : C.grayBorder}`
     }
-  }, pickedB.includes(c.id) ? pickedB.indexOf(c.id) + 1 : ""), /*#__PURE__*/React.createElement("div", {
+  }, sortMethod === "drag" ? idx + 1 : pickedB.includes(c.id) ? pickedB.indexOf(c.id) + 1 : ""), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       minWidth: 0
@@ -2947,18 +2967,11 @@ function MyCasesTab({
       fontSize: 14,
       marginTop: 10
     }
-  }, "目前沒有", cur.label, "案件")), /*#__PURE__*/React.createElement("div", {
-    ref: section === 1 ? listRef : null
-  }, sortMode && section === 1 && sortMethod === "B" ? renderSortRows() : cur.cases.map((c, idx) => /*#__PURE__*/React.createElement(CaseCard, {
+  }, "目前沒有", cur.label, "案件")), /*#__PURE__*/React.createElement("div", null, sortMode && section === 1 ? renderSortRows() : cur.cases.map((c, idx) => /*#__PURE__*/React.createElement(CaseCard, {
     key: c.id,
     c: c,
     idx: idx,
     total: cur.cases.length,
-    sortMode: sortMode && sortMethod === "drag",
-    isDragging: dragIdx === idx,
-    onDragStart: section === 1 && sortMethod === "drag" ? handleDragStart(idx) : undefined,
-    onDragMove: section === 1 && sortMethod === "drag" ? handleDragMove : undefined,
-    onDragEnd: section === 1 && sortMethod === "drag" ? handleDragEnd : undefined,
     onAccept: () => onAccept(c.id),
     onPickup: () => onPickup(c.id),
     onReject: () => onReject(c.id),
