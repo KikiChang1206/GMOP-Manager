@@ -4349,10 +4349,15 @@ function MainApp({
     }));
     setTripEndModal(false);
   };
-  const handleAccept = id => setCases(cs => cs.map(c => c.id === id ? {
-    ...c,
-    status: "已接單"
-  } : c));
+  const handleAccept = id => setCases(cs => {
+    const waiting = cs.filter(c => c.driver_id === me && (c.status === "待取件" || c.status === "已接單"));
+    const minOrder = waiting.length ? Math.min(...waiting.map(c => c.order ?? 0)) : 0;
+    return cs.map(c => c.id === id ? {
+      ...c,
+      status: "已接單",
+      order: minOrder - 1
+    } : c);
+  });
   const handleReject = (id, remark) => {
     setCases(cs => cs.map(c => c.id === id ? {
       ...c,
