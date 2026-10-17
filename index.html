@@ -326,145 +326,52 @@ function(a,b,c){if(!Vd(b))throw Error(m(200));return Wd(null,a,b,!1,c)};Q.unmoun
 
 </script>
 
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-
 <script>
 const { useState, useRef, useEffect, useCallback } = React;
 
-// ── Firebase：讓司機／隊長／客人的手機即時同步同一份資料 ──
-const firebaseConfig = {
-  apiKey: "AIzaSyA1eVugDZKhoaaBjqSzrbjUEXevWIMurO0",
-  authDomain: "gmop-manager.firebaseapp.com",
-  databaseURL: "https://gmop-manager-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "gmop-manager",
-  storageBucket: "gmop-manager.firebasestorage.app",
-  messagingSenderId: "724213116516",
-  appId: "1:724213116516:web:04bc7e8158fe2b54687971"
-};
-firebase.initializeApp(firebaseConfig);
-const fbDb = firebase.database();
-// 用「匿名登入」擋掉外部隨便亂讀寫資料庫的人（App 本身會自動、無感登入，使用者不會看到任何登入畫面）。
-// 資料庫的安全性規則會要求 auth != null，所以所有讀寫都要等匿名登入完成後才能進行。
-let resolveAuthReady;
-const authReady = new Promise(resolve => {
-  resolveAuthReady = resolve;
-});
-firebase.auth().onAuthStateChanged(user => {
-  if (user) resolveAuthReady();
-});
-firebase.auth().signInAnonymously().catch(err => console.error("Firebase 匿名登入失敗：", err));
+// ── 雲端登記簿後端（Google 試算表 + Apps Script 守門員）──
+// 所有讀寫都透過守門員，守門員會先驗證登入碼才回資料，外部的人就算有網址也拿不到東西。
+const API_URL = "https://script.google.com/macros/s/AKfycbwkSi0vnDAqYU3tntJ8FlMWj4p_zpXWucUpCOw_WJ2iJx5MFlBCU0j9p4rnj-mPrzAT/exec";
 
-// 用起來像 useState 的陣列（例如 cases），但背後會即時讀寫 Firebase，
-// 而且只會把「真正變動的那幾筆」同步上去，不會整批覆蓋，降低多人同時操作互相蓋掉的機率。
-function useFirebaseList(path, initialList, keyField = "id") {
-  const [list, setListState] = useState(initialList);
-  const listRef = useRef(initialList);
-  const seededRef = useRef(false);
-  useEffect(() => {
-    let cancelled = false;
-    let dbRef = null;
-    let onValue = null;
-    authReady.then(() => {
-      if (cancelled) return;
-      dbRef = fbDb.ref(path);
-      onValue = snap => {
-        const val = snap.val();
-        if (val === null) {
-          if (!seededRef.current) {
-            seededRef.current = true;
-            const seed = {};
-            initialList.forEach(item => {
-              seed[item[keyField]] = item;
-            });
-            dbRef.set(seed);
-          }
-          return;
-        }
-        seededRef.current = true;
-        const next = Object.values(val);
-        listRef.current = next;
-        setListState(next);
-      };
-      dbRef.on("value", onValue);
-    });
-    return () => {
-      cancelled = true;
-      if (dbRef && onValue) dbRef.off("value", onValue);
-    };
-  }, [path]);
-  const setList = useCallback(updater => {
-    const prev = listRef.current;
-    const next = typeof updater === "function" ? updater(prev) : updater;
-    listRef.current = next;
-    const prevMap = {};
-    prev.forEach(item => {
-      prevMap[item[keyField]] = item;
-    });
-    const nextMap = {};
-    next.forEach(item => {
-      nextMap[item[keyField]] = item;
-    });
-    const updates = {};
-    Object.keys(nextMap).forEach(k => {
-      if (JSON.stringify(prevMap[k]) !== JSON.stringify(nextMap[k])) updates[k] = nextMap[k];
-    });
-    Object.keys(prevMap).forEach(k => {
-      if (!(k in nextMap)) updates[k] = null;
-    });
-    if (Object.keys(updates).length) authReady.then(() => fbDb.ref(path).update(updates));
-  }, [path]);
-  return [list, setList];
+// 用登入碼跟守門員拿全部資料
+async function apiLoad(code) {
+  const r = await fetch(API_URL + "?code=" + encodeURIComponent(code) + "&t=" + Date.now());
+  return r.json();
+}
+// 只送有變動的那幾筆：patch = { cases:{id:obj|null,...}, accounts:{...}, trips:{...} }（null = 刪除）
+function apiPatch(code, patch) {
+  return fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ code: code, patch: patch })
+  }).then(r => r.json()).catch(() => ({ ok: false }));
+}
+// 整批覆蓋（重設用）：replace = { cases:[...], accounts:{...}, trips:{...} }
+function apiReplace(code, replace) {
+  return fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ code: code, replace: replace })
+  }).then(r => r.json()).catch(() => ({ ok: false }));
+}
+// 比較前後，算出要送的 patch（新增/修改 = 物件，刪除 = null）
+function diffList(prev, next, key) {
+  const pm = {}, nm = {}, patch = {};
+  (prev || []).forEach(i => { pm[i[key]] = i; });
+  (next || []).forEach(i => { nm[i[key]] = i; });
+  Object.keys(nm).forEach(k => { if (JSON.stringify(pm[k]) !== JSON.stringify(nm[k])) patch[k] = nm[k]; });
+  Object.keys(pm).forEach(k => { if (!(k in nm)) patch[k] = null; });
+  return patch;
+}
+function diffObj(prev, next) {
+  const patch = {};
+  prev = prev || {}; next = next || {};
+  Object.keys(next).forEach(k => { if (JSON.stringify(prev[k]) !== JSON.stringify(next[k])) patch[k] = next[k]; });
+  Object.keys(prev).forEach(k => { if (!(k in next)) patch[k] = null; });
+  return patch;
 }
 
-// 用起來像 useState 的物件（例如 accounts：登入代碼 → 帳號資料），背後即時讀寫 Firebase。
-function useFirebaseObject(path, initialObj) {
-  const [obj, setObjState] = useState(initialObj);
-  const objRef = useRef(initialObj);
-  const seededRef = useRef(false);
-  useEffect(() => {
-    let cancelled = false;
-    let dbRef = null;
-    let onValue = null;
-    authReady.then(() => {
-      if (cancelled) return;
-      dbRef = fbDb.ref(path);
-      onValue = snap => {
-        const val = snap.val();
-        if (val === null) {
-          if (!seededRef.current) {
-            seededRef.current = true;
-            dbRef.set(initialObj);
-          }
-          return;
-        }
-        seededRef.current = true;
-        objRef.current = val;
-        setObjState(val);
-      };
-      dbRef.on("value", onValue);
-    });
-    return () => {
-      cancelled = true;
-      if (dbRef && onValue) dbRef.off("value", onValue);
-    };
-  }, [path]);
-  const setObj = useCallback(updater => {
-    const prev = objRef.current;
-    const next = typeof updater === "function" ? updater(prev) : updater;
-    objRef.current = next;
-    const updates = {};
-    Object.keys(next).forEach(k => {
-      if (JSON.stringify(prev[k]) !== JSON.stringify(next[k])) updates[k] = next[k];
-    });
-    Object.keys(prev).forEach(k => {
-      if (!(k in next)) updates[k] = null;
-    });
-    if (Object.keys(updates).length) authReady.then(() => fbDb.ref(path).update(updates));
-  }, [path]);
-  return [obj, setObj];
-}
+// （資料同步改由 App 元件內的 setCases/setAccounts/setTrips + 每 12 秒輪詢處理，見 App()）
 
 const C = {
   navy: "#1A4A8A",
@@ -4983,16 +4890,23 @@ const DEFAULT_ACCOUNTS = {
 
 // ── Login Screen ──────────────────────────────────────────
 function LoginScreen({
-  accounts,
   onLogin
 }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState(false);
-  const handleSubmit = () => {
-    const account = accounts[code.trim().toLowerCase()];
-    if (account) {
-      setError(false);
-      onLogin(account);
+  const [loading, setLoading] = useState(false);
+  const handleSubmit = async () => {
+    const c = code.trim().toLowerCase();
+    if (!c) {
+      setError(true);
+      return;
+    }
+    setLoading(true);
+    setError(false);
+    const j = await apiLoad(c).catch(() => null);
+    setLoading(false);
+    if (j && j.ok && j.me) {
+      onLogin({ ...j.me, code: c }, j);
     } else {
       setError(true);
     }
@@ -5079,21 +4993,22 @@ function LoginScreen({
       fontSize: 12,
       marginBottom: 16
     }
-  }, "⚠️ 代碼不正確，請再試一次"), /*#__PURE__*/React.createElement("button", {
+  }, "⚠️ 代碼不正確或連線失敗，請再試一次"), /*#__PURE__*/React.createElement("button", {
     onClick: handleSubmit,
+    disabled: loading,
     style: {
       width: "100%",
-      background: `linear-gradient(135deg,${C.blue},${C.blueMid})`,
+      background: loading ? C.grayBorder : `linear-gradient(135deg,${C.blue},${C.blueMid})`,
       border: "none",
       borderRadius: 14,
       padding: 15,
       color: C.white,
       fontSize: 16,
       fontWeight: 800,
-      cursor: "pointer",
+      cursor: loading ? "default" : "pointer",
       boxShadow: C.shadowBlue
     }
-  }, "登入")), /*#__PURE__*/React.createElement("div", {
+  }, loading ? "登入中…" : "登入")), /*#__PURE__*/React.createElement("div", {
     style: {
       color: "rgba(255,255,255,0.5)",
       fontSize: 11,
@@ -6486,16 +6401,70 @@ function AdminScreen({
 
 function App() {
   const [account, setAccount] = useState(null);
-  const [cases, setCases] = useFirebaseList("cases", initCases);
-  const [accounts, setAccounts] = useFirebaseObject("accounts", DEFAULT_ACCOUNTS);
+  const [cases, setCasesState] = useState([]);
+  const [accounts, setAccountsState] = useState({});
   // 各司機的出發資訊（車牌／里程／回程回報），存在雲端讓大家都看得到，也避免車牌重複。
-  const [trips, setTrips] = useFirebaseObject("trips", {});
+  const [trips, setTripsState] = useState({});
+  const codeRef = useRef(null);
+  const casesRef = useRef([]);
+  casesRef.current = cases;
+  const accountsRef = useRef({});
+  accountsRef.current = accounts;
+  const tripsRef = useRef({});
+  tripsRef.current = trips;
+  const applyPayload = j => {
+    if (j && j.cases) setCasesState(j.cases);
+    if (j && j.accounts) setAccountsState(j.accounts);
+    if (j && j.trips) setTripsState(j.trips);
+  };
+  // 登入後每 12 秒跟守門員同步一次（取代 Firebase 的即時推送）
+  useEffect(() => {
+    if (!account) return;
+    let stop = false;
+    const tick = async () => {
+      const j = await apiLoad(codeRef.current).catch(() => null);
+      if (j && j.ok && !stop) applyPayload(j);
+    };
+    const id = setInterval(tick, 12000);
+    return () => {
+      stop = true;
+      clearInterval(id);
+    };
+  }, [account]);
+  // 寫入：先更新畫面（樂觀更新），再把有變動的那幾筆送給守門員
+  const setCases = updater => {
+    const prev = casesRef.current;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    casesRef.current = next;
+    setCasesState(next);
+    const patch = diffList(prev, next, "id");
+    if (Object.keys(patch).length) apiPatch(codeRef.current, { cases: patch });
+  };
+  const setAccounts = updater => {
+    const prev = accountsRef.current;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    accountsRef.current = next;
+    setAccountsState(next);
+    const patch = diffObj(prev, next);
+    if (Object.keys(patch).length) apiPatch(codeRef.current, { accounts: patch });
+  };
+  const setTrips = updater => {
+    const prev = tripsRef.current;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    tripsRef.current = next;
+    setTripsState(next);
+    const patch = diffObj(prev, next);
+    if (Object.keys(patch).length) apiPatch(codeRef.current, { trips: patch });
+  };
   // 用最新的帳號資料更新司機清單，讓 dName/dPhone/TeamTab/AssignModal 都拿到最新司機。
   DRIVERS = driversFromAccounts(accounts);
   if (!account) {
     return /*#__PURE__*/React.createElement(LoginScreen, {
-      accounts: accounts,
-      onLogin: setAccount
+      onLogin: (acc, payload) => {
+        codeRef.current = acc.code;
+        applyPayload(payload);
+        setAccount(acc);
+      }
     });
   }
 
