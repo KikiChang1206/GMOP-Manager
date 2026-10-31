@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GOOD MAJI KUL Pre-Alert 產生器</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#1a2332; --ink-soft:#4a5568; --line:#dfe3ea;
+    --paper:#f7f6f2; --card:#ffffff; --accent:#c8492e; --accent-soft:#fbeae6;
+    --ok:#1f7a4d; --ok-soft:#e7f3ec; --blue:#2563a8; --yellow:#b8860b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"Inter","Noto Sans TC",-apple-system,sans-serif;
+    background:var(--paper); color:var(--ink); line-height:1.55;
+    padding:24px 16px; max-width:620px; margin:0 auto;
+  }
+  .head{border-bottom:2px solid var(--ink); padding-bottom:14px; margin-bottom:22px}
+  .head .eyebrow{font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:700}
+  .head h1{font-size:26px; font-weight:800; letter-spacing:-.01em; margin-top:4px}
+  .head p{color:var(--ink-soft); font-size:14px; margin-top:4px}
+
+  .grid{display:flex; flex-direction:column; gap:20px}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px}
+  .card h2{font-size:13px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:14px; display:flex; align-items:center; gap:8px}
+  .card h2 .n{background:var(--ink); color:#fff; width:22px; height:22px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700}
+
+  label{display:block; font-size:13px; font-weight:600; margin:12px 0 5px; color:var(--ink)}
+  .tip{position:relative; display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; font-size:11px; cursor:help; color:var(--accent); outline:none; margin-left:4px; vertical-align:middle}
+  .tip .tip-bubble{visibility:hidden; opacity:0; transition:opacity .15s; position:absolute; left:50%; bottom:150%; transform:translateX(-50%); width:230px; background:var(--ink); color:#fff; font-size:12px; font-weight:400; line-height:1.5; padding:8px 10px; border-radius:8px; z-index:10; box-shadow:0 4px 14px rgba(0,0,0,.18); text-align:left}
+  .tip .tip-bubble::after{content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:6px solid transparent; border-top-color:var(--ink)}
+  .tip:hover .tip-bubble, .tip:focus .tip-bubble{visibility:visible; opacity:1}
+  input[type=text],input[type=date],select{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+    font-size:15px; font-family:inherit; background:#fff; color:var(--ink);
+  }
+  input:focus,select:focus{outline:2px solid var(--accent); outline-offset:-1px; border-color:transparent}
+
+  .drop{
+    border:2px dashed var(--line); border-radius:10px; padding:26px 16px; text-align:center;
+    cursor:pointer; transition:.15s; background:#fafafa;
+  }
+  .drop:hover,.drop.over{border-color:var(--accent); background:var(--accent-soft)}
+  .drop .big{font-size:15px; font-weight:600}
+  .drop .sub{font-size:12px; color:var(--ink-soft); margin-top:4px}
+  .drop.loaded{border-style:solid; border-color:var(--ok); background:var(--ok-soft)}
+
+  .flight-tag{display:inline-flex; align-items:center; gap:6px; background:var(--accent-soft); color:var(--accent); padding:4px 10px; border-radius:6px; font-size:13px; font-weight:700; margin-top:8px}
+  .hint{font-size:12px; color:var(--ink-soft); margin-top:5px}
+
+  .stats{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px}
+  .stat{background:var(--paper); border-radius:8px; padding:12px; text-align:center}
+  .stat .v{font-size:22px; font-weight:800; letter-spacing:-.02em}
+  .stat .l{font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.05em; margin-top:2px}
+  .courier-row{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:14px}
+  .courier-row:last-child{border-bottom:none}
+  .dot{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:7px; vertical-align:middle}
+  .dot.blue{background:var(--blue)} .dot.yellow{background:var(--yellow)}
+  .dot.red{background:#c8492e} .dot.white{background:#fff; border:1px solid #c8492e}
+
+  .out-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
+  .recip-block{font-size:13px; background:var(--paper); border-radius:8px; padding:12px; margin-bottom:10px}
+  .broker-row{display:flex; gap:8px; margin-bottom:12px}
+  .broker-btn{flex:1; padding:12px 8px; border:2px solid var(--line); background:#fff; border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; color:var(--ink-soft); cursor:pointer; transition:.12s}
+  .broker-btn:hover{border-color:var(--accent)}
+  .broker-btn.active{border-color:var(--accent); background:var(--accent-soft); color:var(--accent)}
+  .country-row{display:flex; gap:8px; margin-top:4px}
+  .mini-btn{flex:1; padding:10px; border:2px solid var(--line); background:#fff; border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; color:var(--ink-soft); cursor:pointer; transition:.12s}
+  .mini-btn:hover{border-color:var(--accent)}
+  .mini-btn.active{border-color:var(--accent); background:var(--accent-soft); color:var(--accent)}
+  .pick-wrap{margin-top:10px; display:flex; flex-direction:column; gap:6px}
+  .pick-btn{text-align:left; padding:10px 12px; border:1px solid var(--line); background:#fff; border-radius:8px; font-family:inherit; font-size:13px; cursor:pointer}
+  .pick-btn:hover{border-color:var(--accent); background:var(--accent-soft)}
+  .em-row{display:flex; justify-content:space-between; align-items:center; padding:2px 0}
+  .add-row{display:flex; gap:6px; margin-top:10px; flex-wrap:wrap}
+  .add-row input{flex:1; min-width:140px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; font-size:13px}
+  .btn-sm{padding:6px 12px; font-size:13px}
+  .danger{color:var(--accent)}
+  .express-preview{margin-top:12px; padding:12px; background:#fafafa; border:1px solid var(--line); border-radius:8px; overflow-x:auto}
+  .express-preview table{margin-bottom:12px}
+  .recip-block strong{display:block; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin-bottom:4px}
+  .recip-block .em{font-family:ui-monospace,monospace; font-size:12px; color:var(--ink); word-break:break-all; line-height:1.7}
+
+  textarea{
+    width:100%; min-height:280px; padding:14px; border:1px solid var(--line); border-radius:8px;
+    font-family:ui-monospace,"SF Mono",monospace; font-size:13px; line-height:1.6; resize:vertical; background:#fff;
+  }
+  .btn{
+    border:none; border-radius:8px; padding:11px 18px; font-size:14px; font-weight:700;
+    font-family:inherit; cursor:pointer; transition:.12s;
+  }
+  .btn-primary{background:var(--accent); color:#fff; width:100%; font-size:15px; padding:14px}
+  .btn-primary:hover{background:#a83a22}
+  .btn-copy{background:var(--ink); color:#fff}
+  .btn-copy:hover{background:#000}
+  .btn-copy.done{background:var(--ok)}
+  .btn-ghost{background:#fff; border:1px solid var(--line); color:var(--ink)}
+  .btn-ghost:hover{border-color:var(--ink)}
+  .subj-row{display:flex; gap:8px; align-items:stretch; margin-bottom:12px}
+  .subj-row input{flex:1; font-weight:600}
+  .warn{background:#fff4e5; border:1px solid #f0c873; color:#8a5a00; padding:10px 12px; border-radius:8px; font-size:13px; margin-top:10px; display:none}
+  .warn.show{display:block}
+  .email-btn{display:block; width:100%; text-align:center; background:var(--ok); color:#fff !important; border:none; padding:14px; font-weight:700; font-size:15px; text-decoration:none; border-radius:8px; margin-top:12px; transition:.12s}
+  .email-btn:hover{background:#19663f}
+  footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:30px; padding-top:16px; border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div class="eyebrow">GOOD MAJI · Logistics</div>
+  <h1>Pre-Alert 信件產生器 <span class="tip" tabindex="0">❗<span class="tip-bubble">選國別與進倉日查出 MAWB、上傳「一般」檔自動算袋數票數、選清關公司，最後產生 Gmail 草稿。</span></span></h1>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2><span class="n">1</span> 班機 & 提單</h2>
+    <label>國別</label>
+    <div class="country-row">
+      <button class="mini-btn" data-c="MY" onclick="selectCountry('MY')">🇲🇾 馬來西亞</button>
+      <button class="mini-btn" data-c="SG" onclick="selectCountry('SG')">🇸🇬 新加坡</button>
+    </div>
+
+    <label style="margin-top:14px">進倉日 <span class="tip" tabindex="0">❗<span class="tip-bubble">選國別 + 進倉日，按「查資料庫」自動帶出當天進倉的 MAWB 與航班。</span></span></label>
+    <div class="row" style="display:flex; gap:8px">
+      <input type="date" id="whDate" style="flex:1">
+      <button class="btn btn-ghost" id="lookupBtn" style="flex:0 0 auto">查資料庫</button>
+    </div>
+    <div id="lookupResult"></div>
+
+    <div id="flightTag"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">2</span> 「一般」檔案上傳</h2>
+    <div class="drop" id="drop">
+      <div class="big" id="dropBig">點此或拖曳上傳 .xls / .xlsx</div>
+      <div class="sub" id="dropSub">直接丟原始檔，系統依袋號自動分類五家快遞、算袋數票數總重</div>
+    </div>
+    <div id="statsWrap"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">3</span> 收件人</h2>
+    <div id="recipients"><div class="hint">選好國別後自動帶出，可編輯。</div></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">4</span> 信件草稿 <span class="tip" tabindex="0">❗<span class="tip-bubble">會彈出 Gmail 撰寫視窗，收件人、副本、主旨、內文全帶好。Gmail 規格無法自動帶附件，請手動拉入三個 PDF 再寄出。</span></span></h2>
+    <input type="text" id="subject" style="display:none">
+    <textarea id="body" style="display:none"></textarea>
+    <a id="gmailBtn" class="email-btn" href="#" target="_blank" style="display:none">📧 開啟 Gmail 草稿（內容已帶好，拉入 MAWB/Invoice/BL 後寄出）</a>
+    <div id="expressWrap" style="display:none; margin-top:14px">
+      <button class="btn btn-copy" id="copyExpress" style="width:100%">📋 複製專車表格（貼到 Gmail 草稿裡）</button>
+      <div class="hint" style="margin-top:6px"><span class="tip" tabindex="0">❗<span class="tip-bubble">按上面藍色「產生草稿並開 Gmail」時會自動複製這個表格；若沒複製成功，再按這顆，回到 Gmail 草稿內文按貼上即可。</span></span> 自動複製失敗時的備援按鈕</div>
+      <div id="expressPreview" class="express-preview"></div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="genBtn">產生草稿並開 Gmail（有專車自動複製表格）</button>
+  <div class="warn" id="warn"></div>
+</div>
+
+<footer>檔案在本機運算不上傳 · 收件人與班表來自公司共用雲端 · GOOD MAJI 內部工具</footer>
+
+<script>
+// 與 MAWB 資料庫共用同一個雲端 API
+const API_URL = "https://script.google.com/macros/s/AKfycbzb3r_quQmfykKmizbwaI-qHXYF_gK5lm_G-0GtS_rC_myWDxrf7caK9Q_gmaDT-eYE/exec";
+
+// 航班表：依 MAWB 開頭判斷。MY 與 SG 的目的地不同
+const FLIGHTS = {
+  "843": {flight:"D7-379", etd:"00:20", eta:"05:10", arrOffset:2, dest:"KUL"},
+  "189": {flight:"JX-725", etd:"11:00", eta:"15:50", arrOffset:1, dest:"KUL"},
+  "297": {flight:"CI-721", etd:"08:30", eta:"13:15", arrOffset:1, dest:"KUL"},
+  "695": {flight:"BR-227", etd:"09:30", eta:"14:15", arrOffset:1, dest:"KUL"},
+};
+const COUNTRY_DEST = { MY:"KUL", SG:"SIN" };
+const COUNTRY_NAME = { MY:"馬來西亞", SG:"新加坡" };
+
+let currentCountry = null;
+let RECIPIENTS = [];          // 從雲端載入的收件人分組
+let selectedBroker = null;    // 目前選的清關公司 broker key
+let addOpen = false;          // 新增收件人欄位是否展開
+let sessionExtra = {};        // 單次新增：{brokerKey:[email,...]}（不存雲端）
+let lookupMawb = null;        // 反查選定的那張：{mawb,flight,flightDate,dest}
+// 快遞分類規則：依 BAG NO. 內含的關鍵字判斷（A/B/N 等中段字母忽略）
+// 順序即信件顯示順序
+const COURIERS = [
+  {key:"NINJA", match:"NINJA", label:"Ninjavan", color:"BLUE",           dot:"blue"},
+  {key:"DHL",   match:"DHL",   label:"DHL",      color:"YELLOW",         dot:"yellow"},
+  {key:"COV",   match:"COV",   label:"COV",      color:"WHITE RED TAPE", dot:"white"},
+  {key:"MYTR",  match:"MYTR",  label:"專車",     color:"WHITE RED TAPE", dot:"white"},
+  {key:"WEPO",  match:"WEPO",  label:"專車",     color:"WHITE RED TAPE", dot:"white"},
+];
+function classify(bagNo){
+  const up = (bagNo||"").toUpperCase();
+  for(const c of COURIERS){ if(up.includes(c.match)) return c.key; }
+  return null; // 無法分類
+}
+
+let parsed = null;
+
+const $ = id => document.getElementById(id);
+const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+function getFlightByMawb(mawb){
+  const p = (mawb||"").replace(/\D/g,"").slice(0,3);
+  return FLIGHTS[p] || null;
+}
+
+function fmtDate(d){ return `${String(d.getDate()).padStart(2,"0")} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; }
+function fmtSubjDate(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
+
+// ===== 雲端 =====
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+async function apiGet(params){
+  const url = API_URL + "?" + new URLSearchParams(params).toString();
+  const res = await fetch(url);
+  const text = await res.text();
+  let data;
+  try{ data = JSON.parse(text); }
+  catch(e){
+    // 後端沒回 JSON：多半是 Apps Script 沒重新部署、或存取權不是「任何人」（回傳登入頁 / HTML）
+    throw new Error(`雲端回的不是 JSON（HTTP ${res.status}）。多半是 Apps Script 沒重新部署成新版本，或部署存取權不是「任何人」。回應開頭：${text.slice(0,80).replace(/\s+/g," ")}`);
+  }
+  if(!data.ok) throw new Error(data.error || "讀取失敗");
+  return data;
+}
+async function apiPost(params){
+  const body = new URLSearchParams(params);
+  const res = await fetch(API_URL, {method:"POST", body});
+  const text = await res.text();
+  let data;
+  try{ data = JSON.parse(text); }
+  catch(e){ throw new Error(`雲端回的不是 JSON（HTTP ${res.status}）。請確認 Apps Script 已重新部署、存取權為「任何人」。`); }
+  if(!data.ok) throw new Error(data.error || "操作失敗");
+  return data;
+}
+// 帶重試（網路/暫時性錯誤退避重試），讀取類用這個
+async function apiGetRetry(params, tries=3){
+  let last;
+  for(let i=0;i<tries;i++){
+    try{ return await apiGet(params); }
+    catch(e){ last=e; if(i<tries-1) await sleep(400*Math.pow(2,i)); }
+  }
+  throw last;
+}
+
+async function loadRecipients(){
+  const data = await apiGetRetry({action:"recipients"});
+  RECIPIENTS = data.rows || [];
+  return RECIPIENTS;
+}
+
+// 收件人載入失敗時的清楚說明 + 重試/診斷
+function recipErrorHTML(err){
+  return `<div class="warn show">收件人載入失敗：${err.message}</div>
+    <div class="add-row" style="margin-top:8px">
+      <button class="btn btn-ghost btn-sm" onclick="selectCountry(currentCountry)">重試</button>
+      <a class="btn btn-ghost btn-sm" href="${API_URL}?action=recipients" target="_blank" style="text-decoration:none">開診斷網址</a>
+    </div>
+    <div class="hint" style="margin-top:6px">點「開診斷網址」看雲端直接回什麼：<br>
+      · 正常 <code>{"ok":true,"rows":[...]}</code> → 前端/CORS 問題<br>
+      · <code>rows:[]</code> → RECIPIENTS 頁籤空的或頁籤名不符<br>
+      · 紅字錯誤 / function not found → Apps Script 沒更新成含 recipients 的版本<br>
+      · 要求登入/授權 → 部署存取權不是「任何人」</div>`;
+}
+
+// ===== 國別 =====
+async function selectCountry(c){
+  currentCountry = c;
+  try{ localStorage.setItem("ga_country", c); }catch(e){} // 記住上次國別
+  selectedBroker = null; sessionExtra = {}; lookupMawb = null; addOpen = false;
+  document.querySelectorAll(".mini-btn").forEach(b=> b.classList.toggle("active", b.dataset.c===c));
+  $("lookupResult").innerHTML = "";
+  $("flightTag").innerHTML = "";
+  $("recipients").innerHTML = '<div class="hint">載入收件人中…</div>';
+  try{
+    await loadRecipients();
+    renderRecipients();
+    if(!brokersForCountry().length){
+      $("recipients").insertAdjacentHTML("afterbegin",
+        `<div class="warn show">雲端有回應，但「${COUNTRY_NAME[c]}」沒有清關公司名單。請到雲端 RECIPIENTS 頁籤新增 country=${c} 的列。</div>`);
+    }
+  }catch(err){
+    $("recipients").innerHTML = recipErrorHTML(err);
+  }
+  // 選完國別若已填進倉日 → 自動查（少按一次「查資料庫」）
+  if($("whDate").value) doLookup(true);
+}
+
+// ===== 反查資料庫 =====
+// silent=true 時（自動觸發）不跳 alert
+async function doLookup(silent){
+  if(!currentCountry){ if(!silent) alert("請先選國別"); return; }
+  const wh = $("whDate").value;
+  if(!wh){ if(!silent) alert("請先選進倉日"); return; }
+  $("lookupResult").innerHTML = '<div class="hint">查詢中…</div>';
+  try{
+    const data = await apiGetRetry({action:"list", country:currentCountry});
+    const hits = (data.rows||[]).filter(r=> r.warehouse===wh);
+    if(!hits.length){
+      $("lookupResult").innerHTML = `<div class="warn show">資料庫中沒有進倉日 ${wh} 的單。請確認日期，或先到 MAWB 資料庫登錄。</div>`;
+      return;
+    }
+    if(hits.length===1){ pickMawb(hits[0]); return; } // 單張自動帶入，免點選
+    // 多筆 → 跳清單
+    const items = hits.map((h,i)=>`<button class="pick-btn" onclick='pickMawbIdx(${i})'>${h.mawb} · ${h.flight} · 航班日 ${h.flightDate}</button>`).join("");
+    window._lookupHits = hits;
+    $("lookupResult").innerHTML = `<div class="pick-wrap"><div class="hint">這天有 ${hits.length} 張，點選要發的那一張：</div>${items}</div>`;
+  }catch(err){
+    $("lookupResult").innerHTML = `<div class="warn show">查詢失敗：${err.message}</div>`;
+  }
+}
+function pickMawbIdx(i){ pickMawb(window._lookupHits[i]); }
+function pickMawb(h){
+  lookupMawb = h;
+  const f = getFlightByMawb(h.mawb);
+  $("lookupResult").innerHTML = `<div class="recip-block"><strong>已選這張</strong><div class="em">${h.mawb} · ${h.flight} · 航班日 ${h.flightDate}</div></div>`;
+  updateFlightTag();
+}
+
+function updateFlightTag(){
+  if(!lookupMawb){ $("flightTag").innerHTML=""; return; }
+  const f = getFlightByMawb(lookupMawb.mawb);
+  const dest = f ? f.dest : (COUNTRY_DEST[currentCountry]||"KUL");
+  if(!f){
+    $("flightTag").innerHTML = `<div class="hint danger">MAWB 開頭無對應航班表，航班資訊需手動確認。</div>`;
+    return;
+  }
+  const d = new Date(lookupMawb.flightDate+"T00:00:00");
+  const a = new Date(d); a.setDate(a.getDate()+f.arrOffset);
+  $("flightTag").innerHTML = `<span class="flight-tag">✈ ${f.flight} · TPE→${dest} · ETD ${f.etd} / ETA ${f.eta}</span>
+    <div class="hint" style="margin-top:6px">ETD ${f.etd}，${fmtDate(d)} → ETA ${f.eta}，<b>${fmtDate(a)}</b>（${f.arrOffset===2?"D+2":"D+1"} 到達）</div>`;
+}
+
+// ===== 收件人 =====
+function brokersForCountry(){
+  return RECIPIENTS.filter(r=> r.country===currentCountry && r.type!=="CC" && r.broker!=="CC");
+}
+function ccForCountry(){
+  const cc = RECIPIENTS.find(r=> r.country===currentCountry && (r.type==="CC"||r.broker==="CC"));
+  return cc ? cc.emails.split(",").map(s=>s.trim()).filter(Boolean) : [];
+}
+function toListFor(brokerKey){
+  const g = RECIPIENTS.find(r=> r.country===currentCountry && r.broker===brokerKey);
+  const base = g ? g.emails.split(",").map(s=>s.trim()).filter(Boolean) : [];
+  const extra = sessionExtra[brokerKey] || [];
+  return [...base, ...extra];
+}
+
+function selectBroker(key){ selectedBroker = key; addOpen = false; renderRecipients(); }
+
+function renderRecipients(){
+  if(!currentCountry){ $("recipients").innerHTML = '<div class="hint">請先選國別。</div>'; return; }
+  const groups = brokersForCountry();
+  const btns = groups.map(g=>{
+    const active = selectedBroker===g.broker;
+    return `<button class="broker-btn${active?' active':''}" onclick="selectBroker('${g.broker}')">${active?'✓ ':''}${g.label}</button>`;
+  }).join("");
+
+  let toBlock;
+  if(selectedBroker){
+    const list = toListFor(selectedBroker);
+    const emailRows = list.map(em=>`<div class="em-row"><span>${em}</span></div>`).join("");
+    const label = (groups.find(g=>g.broker===selectedBroker)||{}).label||selectedBroker;
+    const addBlock = addOpen ? `
+      <div class="add-row">
+        <input type="email" id="newEmail" placeholder="輸入 email…">
+        <button class="btn btn-ghost btn-sm" onclick="addOnce()">單次</button>
+        <button class="btn btn-ghost btn-sm" onclick="addPermanent()">永久</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleAdd()">取消</button>
+      </div>
+      <div class="hint" style="margin-top:4px"><span class="tip" tabindex="0">❗<span class="tip-bubble">單次：只用這次。永久：存雲端，加到「${currentCountry} · ${label}」，所有人下次都看到。</span></span> 單次 / 永久</div>`
+      : `<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="toggleAdd()">＋ 新增收件人</button>`;
+    toBlock = `<div class="recip-block">
+      <strong>收件人 TO（${label}）</strong>
+      <div class="em">${emailRows}</div>
+      ${addBlock}
+    </div>`;
+  } else {
+    toBlock = `<div class="hint" style="padding:8px 0">👆 請先點選要發給哪間清關公司</div>`;
+  }
+  const cc = ccForCountry();
+  $("recipients").innerHTML = `
+    <div class="broker-row">${btns||'<div class="hint">這個國別還沒有清關公司名單，請到雲端 RECIPIENTS 頁籤新增。</div>'}</div>
+    ${toBlock}
+    <div class="recip-block"><strong>副本 CC</strong><div class="em">${cc.join("\n")||"（無）"}</div></div>`;
+}
+
+window.toggleAdd = function(){ addOpen = !addOpen; renderRecipients(); };
+
+window.addOnce = function(){
+  const v = ($("newEmail").value||"").trim();
+  if(!v) return;
+  if(!selectedBroker) return;
+  (sessionExtra[selectedBroker] = sessionExtra[selectedBroker]||[]).push(v);
+  addOpen = false;
+  renderRecipients();
+};
+window.addPermanent = async function(){
+  const v = ($("newEmail").value||"").trim();
+  if(!v || !selectedBroker) return;
+  if(!confirm(`永久加入 ${v} 到「${currentCountry} · ${selectedBroker}」？所有人下次都會看到。`)) return;
+  try{
+    await apiPost({action:"addRecipient", country:currentCountry, broker:selectedBroker, email:v});
+    await loadRecipients();
+    addOpen = false;
+    renderRecipients();
+  }catch(err){ alert("永久加入失敗：" + err.message); }
+};
+window.pickMawbIdx = pickMawbIdx;
+window.selectCountry = selectCountry;
+
+function parseWorkbook(data){
+  const wb = XLSX.read(data, {type:"array"});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, {defval:""});
+  if(!rows.length) throw new Error("Excel 沒有資料列");
+
+  // 彈性比對欄位名稱
+  const keys = Object.keys(rows[0]);
+  const find = (...names)=> keys.find(k => names.some(n => k.toLowerCase().replace(/[\s.()]/g,"").includes(n)));
+  const cBag = find("bagno","bagconsol","bag");
+  const cWt  = find("wtkg","weight","wt");
+  const cPcs = find("pcs","pieces");
+  const cName = find("consigneesname","consigneename","name");
+  const cAddr = find("consigneesaddress","consigneeaddress","address");
+  const cTel  = find("consigneestel","consigneetel","tel","phone");
+  const cPost = find("postcode","postal");
+  if(!cBag) throw new Error("找不到 BAG NO. 欄位");
+
+  const agg = {}; const unknownBags=new Set();
+  let totalWt=0, totalCN=0; const allBags=new Set();
+  const expressDetail = { MYTR:[], WEPO:[] }; // 專車逐筆明細
+  for(const r of rows){
+    const bag = String(r[cBag]||"").trim();
+    if(!bag) continue; // 略過無袋號行
+    const key = classify(bag);
+    const wt  = parseFloat(r[cWt]) || 0;
+    // 件數：每行算 1 票(C/N)；若有 PCS 欄仍以行數為票數(與信件 C/N 一致)
+    totalWt += wt; totalCN++; allBags.add(bag);
+    if(!key){ unknownBags.add(bag); continue; }
+    if(!agg[key]) agg[key]={cn:0, bags:new Set(), wt:0};
+    agg[key].cn++; agg[key].bags.add(bag); agg[key].wt += wt;
+    // 專車：收集地址明細
+    if(key==="MYTR" || key==="WEPO"){
+      expressDetail[key].push({
+        bag,
+        name: String(r[cName]||"").trim(),
+        addr: String(r[cAddr]||"").trim(),
+        tel:  String(r[cTel]||"").trim(),
+        post: String(r[cPost]||"").trim()
+      });
+    }
+  }
+
+  const couriers = [];
+  for(const c of COURIERS){
+    if(agg[c.key]) couriers.push({
+      ...c, cn:agg[c.key].cn, bags:agg[c.key].bags.size, wt:Math.round(agg[c.key].wt*100)/100
+    });
+  }
+  return {
+    couriers,
+    totalCN, totalBags:allBags.size, totalWt:Math.round(totalWt*100)/100,
+    unknownBags:[...unknownBags],
+    expressDetail
+  };
+}
+
+// 專車分組：MYTR / WEPO 各自，依姓名+電話+地址分組
+function groupExpress(parsed){
+  const result = {};
+  for(const key of ["MYTR","WEPO"]){
+    const rows = (parsed.expressDetail && parsed.expressDetail[key]) || [];
+    if(!rows.length) continue;
+    const groups = {};
+    for(const r of rows){
+      const gk = `${r.name}|${r.tel}|${r.addr}`;
+      if(!groups[gk]) groups[gk] = {name:r.name, tel:r.tel, addr:r.addr, post:r.post, bags:[]};
+      if(groups[gk].bags.indexOf(r.bag)===-1) groups[gk].bags.push(r.bag);
+    }
+    result[key] = Object.values(groups);
+  }
+  return result;
+}
+
+// 產生專車明細 HTML 表格（給複製貼上 Gmail 用）
+function buildExpressHTML(parsed){
+  if(!parsed) return "";
+  const grouped = groupExpress(parsed);
+  let html = "";
+  for(const key of ["MYTR","WEPO"]){
+    const list = grouped[key];
+    if(!list || !list.length) continue;
+    html += `<p style="font-weight:bold;margin:14px 0 6px">專車 ${key}</p>`;
+    for(const g of list){
+      const addr = (g.addr||"") + (g.post?(" "+g.post):"");
+      html += `<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;margin-bottom:12px;font-family:Arial,sans-serif;font-size:13px">
+<tr>
+  <td style="font-weight:bold;text-align:center;background:#f2f2f2">專車</td>
+  <td style="font-weight:bold;text-align:center;background:#f2f2f2">Address</td>
+</tr>
+<tr>
+  <td style="vertical-align:top">袋子數量 No. of Bags：${g.bags.length}<br>袋子顏色 Bag Color：WHITE(Red TAPE)<br><br>${g.bags.join("<br>")}</td>
+  <td style="vertical-align:top">${g.name||""}${g.tel?("<br>"+g.tel):""}<br>${addr}</td>
+</tr>
+</table>`;
+    }
+  }
+  return html;
+}
+
+// 預覽用純文字（畫面顯示）
+function buildExpressPreview(parsed){
+  if(!parsed) return "";
+  const grouped = groupExpress(parsed);
+  let out = "";
+  for(const key of ["MYTR","WEPO"]){
+    const list = grouped[key];
+    if(!list || !list.length) continue;
+    out += `\n專車 ${key}\n`;
+    list.forEach((g,i)=>{
+      out += `  收貨方${i+1}：${g.name||"(無)"}｜${g.bags.length} 袋｜${g.bags.join("、")}\n`;
+    });
+  }
+  return out;
+}
+
+function renderStats(){
+  if(!parsed){ $("statsWrap").innerHTML=""; return; }
+  let courierHtml = parsed.couriers.map(c=>{
+    return `<div class="courier-row"><span><span class="dot ${c.dot}"></span>${c.label}</span><span><b>${c.bags}</b> Bags · <b>${c.cn}</b> C/N · ${c.wt} kg</span></div>`;
+  }).join("");
+  let unknownHtml = "";
+  if(parsed.unknownBags && parsed.unknownBags.length){
+    unknownHtml = `<div class="warn show" style="margin-top:10px">⚠ 有 ${parsed.unknownBags.length} 個袋號無法分類（不含 NINJA/DHL/COV/MYTR/WEPO）：${parsed.unknownBags.join("、")}。已計入總數但未歸到任何快遞，請確認。</div>`;
+  }
+  $("statsWrap").innerHTML = `
+    <div class="stats">
+      <div class="stat"><div class="v">${parsed.totalBags}</div><div class="l">Bags</div></div>
+      <div class="stat"><div class="v">${parsed.totalWt}</div><div class="l">KGS</div></div>
+      <div class="stat"><div class="v">${parsed.totalCN}</div><div class="l">C/N</div></div>
+    </div>
+    <div style="margin-top:12px">${courierHtml}</div>${unknownHtml}`;
+}
+
+function generate(){
+  $("warn").className="warn";
+  let warns=[];
+  if(!currentCountry) warns.push("尚未選國別");
+  if(!lookupMawb) warns.push("尚未選 MAWB（請用進倉日查資料庫）");
+  if(!parsed) warns.push("尚未上傳「一般」檔案");
+  if(!selectedBroker) warns.push("尚未選清關公司（收件人會空白）");
+  if(warns.length){ $("warn").textContent="⚠ "+warns.join("； "); $("warn").className="warn show"; }
+
+  const mawb = lookupMawb ? lookupMawb.mawb : "____";
+  const f = lookupMawb ? getFlightByMawb(mawb) : null;
+  const dest = f ? f.dest : (COUNTRY_DEST[currentCountry]||"KUL");
+  const d = lookupMawb ? new Date(lookupMawb.flightDate+"T00:00:00") : null;
+  const etdDate = d ? fmtDate(d) : "____";
+  let etaDate = "____";
+  if(d && f){ const a=new Date(d); a.setDate(a.getDate()+f.arrOffset); etaDate=fmtDate(a); }
+
+  const subj = `${d?fmtSubjDate(d):"_/_"} GOOD MAJI ${dest} Pre-Alert MAWB：${mawb}`;
+  $("subject").value = subj;
+
+  let courierLines = "";
+  if(parsed){
+    for(const c of parsed.couriers){
+      courierLines += `Total ${c.label} ： ${c.bags} Bags , ${c.cn} C/N (Bag Color ${c.color} )\n`;
+    }
+  }
+
+  const body =
+`Hi ${currentCountry==="SG"?"SG":"MY"} Team,
+
+MAWB ： ${mawb}
+Flight No ： ${f?f.flight:"____"}
+Origin ： TPE ， DEST ： ${dest}
+ETD ： ${f?f.etd:"__:__"} ， ${etdDate}
+ETA ： ${f?f.eta:"__:__"} ， ${etaDate}
+Total ： ${parsed?parsed.totalBags:"_"} Bags , ${parsed?parsed.totalWt:"_"} kgs , ${parsed?parsed.totalCN:"_"} C/N
+${courierLines}`;
+  $("body").value = body;
+
+  $("gmailBtn").href = buildGmailUrl();
+  $("gmailBtn").style.display = "block";
+
+  // 專車表格
+  const grouped = parsed ? groupExpress(parsed) : {};
+  const hasExpress = grouped.MYTR?.length || grouped.WEPO?.length;
+  if(hasExpress){
+    window._expressHTML = buildExpressHTML(parsed);
+    $("expressPreview").innerHTML = window._expressHTML;
+    $("expressWrap").style.display = "block";
+  } else {
+    window._expressHTML = "";
+    $("expressWrap").style.display = "none";
+  }
+  return warns;
+}
+
+function recipientsText(){
+  const cc = ccForCountry();
+  if(!selectedBroker) return `TO:\n(未選清關公司)\n\nCC:\n${cc.join("; ")}`;
+  return `TO:\n${toListFor(selectedBroker).join("; ")}\n\nCC:\n${cc.join("; ")}`;
+}
+
+function buildGmailUrl(){
+  const to = selectedBroker ? toListFor(selectedBroker).join(",") : "";
+  const cc = ccForCountry().join(",");
+  const su = encodeURIComponent($("subject").value);
+  const body = encodeURIComponent($("body").value);
+  return `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&cc=${cc}&su=${su}&body=${body}`;
+}
+
+// ---- events ----
+$("lookupBtn").addEventListener("click", ()=>doLookup(false));
+// 選進倉日即自動查（少按一次「查資料庫」）
+$("whDate").addEventListener("change", ()=>doLookup(true));
+
+const drop=$("drop"), fileInput=document.createElement("input");
+fileInput.type="file"; fileInput.accept=".xls,.xlsx";
+drop.addEventListener("click", ()=>fileInput.click());
+fileInput.addEventListener("change", e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); });
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop", e=>{ if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+function handleFile(file){
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      parsed = parseWorkbook(new Uint8Array(ev.target.result));
+      drop.classList.add("loaded");
+      $("dropBig").textContent = "✓ "+file.name;
+      $("dropSub").textContent = `已讀取：${parsed.totalBags} 袋 / ${parsed.totalCN} 票 / ${parsed.totalWt} kg`;
+      renderStats();
+    }catch(err){
+      parsed=null; drop.classList.remove("loaded");
+      $("dropBig").textContent="✗ 讀取失敗";
+      $("dropSub").textContent=err.message;
+      $("statsWrap").innerHTML="";
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// 複製專車表格（HTML 富文本）→ 回傳是否成功，給按鈕與「一鍵」流程共用
+async function copyExpressTable(){
+  const html = window._expressHTML || "";
+  if(!html) return false;
+  try{
+    // 優先用 ClipboardItem 複製成富文本，貼到 Gmail 會保留表格
+    const blob = new Blob([html], {type:"text/html"});
+    const plain = new Blob([$("expressPreview").innerText], {type:"text/plain"});
+    await navigator.clipboard.write([new ClipboardItem({"text/html":blob, "text/plain":plain})]);
+    return true;
+  }catch(err){
+    // 後備：選取預覽區再 execCommand 複製
+    try{
+      const range=document.createRange(); range.selectNodeContents($("expressPreview"));
+      const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      const ok=document.execCommand("copy"); sel.removeAllRanges(); return ok;
+    }catch(e2){ return false; }
+  }
+}
+
+$("copyExpress").addEventListener("click", async (e)=>{
+  const btn = e.target;
+  const ok = await copyExpressTable();
+  if(ok){ const o=btn.textContent; btn.textContent="✓ 已複製，去 Gmail 貼上"; setTimeout(()=>btn.textContent=o,1800); }
+  else alert("複製失敗，請手動選取表格複製。");
+});
+
+// 一鍵：產生草稿 → 開 Gmail →（有專車就）順便複製表格
+$("genBtn").addEventListener("click", async ()=>{
+  const warns = generate();
+  if(warns.length) return; // 有缺東西就只顯示提示，不自動開 Gmail（避免開出半空草稿）
+  // 先開 Gmail（須在點擊手勢內，放在 await 之前以免被彈窗攔截）
+  const win = window.open(buildGmailUrl(), "_blank");
+  const copied = window._expressHTML ? await copyExpressTable() : false;
+  if(!win){
+    // 彈窗被擋 → 退回手動按鈕
+    $("warn").textContent = "瀏覽器擋了彈窗，請按下方綠色按鈕開 Gmail 草稿。";
+    $("warn").className = "warn show";
+    return;
+  }
+  if(copied){
+    $("warn").textContent = "✓ 已開 Gmail 草稿，專車表格也複製好了——回到草稿內文按貼上，再拉入 MAWB/Invoice/BL 後寄出。";
+    $("warn").className = "warn show";
+  } else if(window._expressHTML){
+    $("warn").textContent = "✓ 已開 Gmail 草稿。專車表格沒自動複製成功，請按下方「複製專車表格」再貼上。";
+    $("warn").className = "warn show";
+  }
+});
+
+
+// init
+$("whDate").value = new Date().toISOString().slice(0,10);
+// 記住上次國別：有就自動帶入並載入（localStorage 在部署後才作用）
+try{
+  const last = localStorage.getItem("ga_country");
+  if(last && COUNTRY_NAME[last]) selectCountry(last);
+}catch(e){}
+</script>
+</body>
+</html>
