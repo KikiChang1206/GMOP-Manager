@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>小樹苗成長日記</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="小樹苗日記">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#fbf6ec">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Klee+One:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#fbf6ec; --paper-line:#e9dfc9; --ink:#4a4038; --ink-soft:#8a7d6b;
+    --leaf:#8fc47a; --leaf-dark:#5f9650; --sun:#f4dd9e; --sky:#b9d3e0;
+    --flower:#f3bcc8; --soil:#a9835f; --stamp:#c96a5f; --stamp-bg:#fbeae6;
+    --card:#fffdf8; --shadow:0 3px 10px rgba(74,64,56,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:repeating-linear-gradient(to bottom,transparent,transparent 27px,var(--paper-line) 27px,var(--paper-line) 28px),var(--paper);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei","Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:480px;margin:0 auto;padding:0 0 calc(90px + env(safe-area-inset-bottom));min-height:100vh;padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);}
+  header{padding:20px 20px 4px;position:sticky;top:0;background:var(--paper);z-index:10;text-align:center;}
+  header h1{font-family:"Klee One",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;font-size:21px;margin:0 0 4px;font-weight:600;}
+  header .sub{font-family:"Fredoka",sans-serif;font-size:11px;color:var(--ink-soft);letter-spacing:1.5px;font-weight:500;}
+  #btnRefresh{margin-top:6px;border:none;background:none;color:var(--ink-soft);font-size:12px;text-decoration:underline;cursor:pointer;}
+
+  /* Tab navigation */
+  .tab-row{display:none;gap:8px;padding:8px 20px 4px;justify-content:center;}
+  .tab-row.visible{display:flex;}
+  .tab-btn{border:1.5px solid var(--paper-line);background:var(--card);color:var(--ink-soft);padding:6px 18px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
+  .tab-btn.active{background:var(--leaf-dark);border-color:var(--leaf-dark);color:#fff;}
+
+  .plant-row{display:flex;gap:10px;overflow-x:auto;padding:8px 16px 14px;scrollbar-width:thin;}
+  .plant-slot{flex:none;width:78px;text-align:center;background:var(--card);border:1.5px solid var(--paper-line);border-radius:12px;padding:8px 4px;}
+  .plant-slot.locked{opacity:0.55;}
+  .plant-slot svg{display:block;margin:0 auto;filter:drop-shadow(0 3px 5px rgba(74,64,56,0.10));}
+  .plant-slot .m-label{font-family:"Fredoka",sans-serif;font-size:10.5px;font-weight:600;color:var(--ink);margin-top:2px;}
+  .plant-slot .m-status{font-size:9.5px;color:var(--ink-soft);margin-top:1px;line-height:1.3;}
+  .plant-intro{text-align:center;font-size:12px;color:var(--ink-soft);padding:6px 20px 2px;}
+  @keyframes growPop{0%{transform:scale(0.85);opacity:0.4;}60%{transform:scale(1.06);opacity:1;}100%{transform:scale(1);}}
+  .plant-slot.grow-in svg{animation:growPop 0.5s ease;}
+
+  .panel{padding:14px 20px;}
+  .compose{position:relative;background:var(--card);border:1.5px solid var(--paper-line);border-radius:4px 4px 14px 14px;padding:20px 16px 16px;margin-bottom:22px;box-shadow:var(--shadow);}
+  .compose::before{content:"🌿";position:absolute;top:-14px;left:24px;font-size:20px;transform:rotate(-8deg);}
+  .compose label{display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:5px;font-weight:700;}
+  .compose input,.compose textarea{width:100%;border:none;border-bottom:2px dashed var(--paper-line);border-radius:0;padding:8px 4px;font-size:14.5px;font-family:inherit;background:transparent;color:var(--ink);margin-bottom:14px;resize:vertical;}
+  .compose input:focus,.compose textarea:focus{outline:none;border-bottom-color:#5f9650;}
+  .compose textarea{min-height:72px;}
+  .compose button.submit{width:100%;border:2px solid var(--ink);background:#8fc47a;color:var(--ink);padding:11px 0;border-radius:20px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:2px 2px 0 var(--ink);}
+  .compose button.submit:active{transform:translate(2px,2px);box-shadow:none;}
+
+  .entry{position:relative;background:var(--card);border:1.5px solid var(--paper-line);border-radius:4px 4px 14px 14px;margin-bottom:26px;box-shadow:var(--shadow);overflow:visible;}
+  .entry::before{content:"🌱";position:absolute;top:-13px;left:22px;font-size:18px;}
+  .entry.tape-1::before{content:"🌿";}
+  .entry.tape-2::before{content:"🍃";}
+  .entry.tape-3::before{content:"🌼";}
+  .entry-head{display:flex;justify-content:space-between;align-items:center;padding:14px 14px 6px;}
+  .entry-head .who{font-size:13.5px;font-weight:700;color:var(--ink);background:#8fc47a;padding:2px 10px;border-radius:10px;}
+  .entry-head .when{font-family:"Fredoka",sans-serif;font-size:11px;color:var(--ink-soft);font-weight:500;}
+  .entry-body{padding:6px 16px 14px;font-size:14.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word;}
+  .status-row{padding:0 16px 8px;}
+  .status-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;}
+  .status-badge.wait{background:#fff;color:var(--stamp);border:2px dashed var(--stamp);}
+  .status-badge.done{background:var(--stamp);color:#fff;transform:rotate(-3deg);border:2px solid var(--stamp);}
+
+  /* Legacy reply block (舊資料相容) */
+  .reply-block{position:relative;margin:0 14px 12px;background:var(--stamp-bg);border-radius:10px;padding:12px 14px 10px;transform:rotate(-0.6deg);box-shadow:1px 2px 6px rgba(201,106,95,0.15);}
+  .reply-block::before{content:"🌳";position:absolute;top:-14px;left:16px;font-size:18px;}
+  .reply-block .label{font-size:11.5px;font-weight:700;color:var(--stamp);margin-bottom:6px;}
+  .reply-text{font-size:13.5px;line-height:1.65;color:#5a3530;white-space:pre-wrap;word-break:break-word;}
+  .reply-meta{font-family:"Fredoka",sans-serif;font-size:10.5px;color:#b3847c;margin-top:8px;font-weight:500;}
+
+  /* Thread */
+  .thread-toggle{display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--paper-line);background:var(--card);color:var(--ink-soft);padding:5px 14px;border-radius:20px;font-size:11.5px;font-weight:600;cursor:pointer;margin:2px 14px 12px;}
+  .thread-toggle.has-msgs{color:var(--leaf-dark);border-color:var(--leaf-dark);}
+  .thread-panel{margin:0 14px 14px;border-top:1.5px dashed var(--paper-line);padding-top:10px;}
+  .thread-msg{display:flex;flex-direction:column;margin-bottom:10px;}
+  .thread-msg.by-me{align-items:flex-end;}
+  .thread-msg.by-other{align-items:flex-start;}
+  .thread-who{font-size:10.5px;color:var(--ink-soft);font-weight:700;margin-bottom:3px;}
+  .thread-who.by-me{text-align:right;}
+  .thread-bubble{max-width:86%;padding:9px 13px;font-size:13.5px;line-height:1.55;word-break:break-word;white-space:pre-wrap;}
+  .thread-bubble.by-me{background:var(--leaf);color:var(--ink);border-radius:14px 4px 14px 14px;}
+  .thread-bubble.by-other{background:var(--stamp-bg);color:#5a3530;border-radius:4px 14px 14px 14px;}
+  .thread-time{font-family:"Fredoka",sans-serif;font-size:9.5px;color:var(--ink-soft);margin-top:3px;}
+  .thread-time.by-me{text-align:right;}
+  .thread-input-row{display:flex;gap:8px;align-items:flex-end;margin-top:10px;}
+  .thread-input-row textarea{flex:1;border:1.5px solid var(--paper-line);border-radius:10px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink);background:#fff;resize:none;min-height:38px;max-height:100px;overflow-y:auto;}
+  .thread-input-row textarea:focus{outline:none;border-color:var(--leaf-dark);}
+  .thread-input-row button{flex:none;border:2px solid var(--leaf-dark);background:var(--leaf-dark);color:#fff;padding:8px 14px;border-radius:14px;font-size:12.5px;font-weight:700;cursor:pointer;}
+
+  .filter-bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:12px;}
+  .filter-bar select{border:1.5px solid var(--paper-line);border-radius:10px;padding:5px 10px;font-size:12px;background:var(--card);color:var(--ink);cursor:pointer;}
+  .filter-btn{border:1.5px solid var(--paper-line);background:var(--card);color:var(--ink-soft);padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
+  .filter-btn.active{background:var(--leaf-dark);border-color:var(--leaf-dark);color:#fff;}
+
+  /* 大樹的話 (inbox) */
+  .inbox-msg{background:var(--stamp-bg);border-radius:10px;padding:14px 14px 10px;margin-bottom:10px;box-shadow:1px 2px 6px rgba(201,106,95,0.12);}
+  .inbox-from{font-size:11.5px;font-weight:700;color:var(--stamp);margin-bottom:6px;}
+  .inbox-text{font-size:13.5px;line-height:1.65;color:#5a3530;white-space:pre-wrap;word-break:break-word;}
+  .inbox-date{font-family:"Fredoka",sans-serif;font-size:10.5px;color:#b3847c;margin-top:6px;font-weight:500;}
+
+  /* Public board */
+  .pub-compose{background:var(--card);border:1.5px solid var(--paper-line);border-radius:14px;padding:16px;margin-bottom:20px;box-shadow:var(--shadow);}
+  .pub-compose textarea{width:100%;border:1.5px solid var(--paper-line);border-radius:10px;padding:10px;font-family:inherit;font-size:14px;color:var(--ink);background:#fff;resize:vertical;min-height:72px;margin-bottom:10px;}
+  .pub-compose textarea:focus{outline:none;border-color:var(--leaf-dark);}
+  .pub-compose button{width:100%;border:2px solid var(--ink);background:var(--sky);color:var(--ink);padding:10px 0;border-radius:20px;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:2px 2px 0 var(--ink);}
+  .pub-post{position:relative;background:var(--card);border:1.5px solid var(--paper-line);border-radius:4px 4px 14px 14px;margin-bottom:22px;box-shadow:var(--shadow);}
+  .pub-post::before{content:"🌳";position:absolute;top:-13px;left:22px;font-size:18px;}
+  .pub-head{display:flex;justify-content:space-between;align-items:center;padding:14px 14px 6px;}
+  .pub-who{font-size:13.5px;font-weight:700;color:var(--ink);background:var(--sky);padding:2px 10px;border-radius:10px;}
+  .pub-when{font-family:"Fredoka",sans-serif;font-size:11px;color:var(--ink-soft);}
+  .pub-body{padding:6px 16px 12px;font-size:14.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word;}
+
+  /* Public tree + dog */
+  .pub-tree-row{text-align:center;padding:10px 0 16px;}
+
+  .empty-hint{text-align:center;color:var(--ink-soft);font-size:13.5px;padding:50px 20px;line-height:1.8;}
+  .empty-hint .big{font-size:28px;display:block;margin-bottom:8px;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:9px 20px;border-radius:20px;font-size:12.5px;font-weight:600;opacity:0;pointer-events:none;transition:opacity 0.25s;z-index:50;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>小樹苗成長日記</h1>
+    <div class="sub">GOODMAJI · 每篇留言都在長大</div>
+    <button id="btnRefresh">🔄 更新</button>
+    <div class="tab-row" id="tabRow">
+      <button class="tab-btn active" id="tabDiary" onclick="switchTab('diary')">🌱 日記</button>
+      <button class="tab-btn" id="tabPublic" onclick="switchTab('public')">🌳 公開留言板</button>
+    </div>
+  </header>
+
+  <!-- 日記區 -->
+  <div id="diarySection">
+    <div id="plantArea"></div>
+    <div class="panel">
+      <div id="composeArea"></div>
+      <div id="inboxArea"></div>
+      <div id="list"></div>
+    </div>
+  </div>
+
+  <!-- 公開留言板 -->
+  <div id="publicSection" style="display:none;">
+    <div class="pub-tree-row" id="pubTreeArea"></div>
+    <div class="panel">
+      <div id="pubCompose"></div>
+      <div id="pubList"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ───── State ─────
+let entries = [], inboxMessages = [], staffList = [];
+let publicPosts = [];
+let threadData = {};    // threadId → [msgs] (diary + inbox)
+let pubThreadData = {}; // threadId → [msgs] (public board)
+let staffLoggedIn = false, testMode = false;
+let staffAuthor = '', staffAccount = '', staffRole = '';
+let filterAuthor = 'all', filterStatus = 'all';
+let activeTab = 'diary';
+let expandedThreads = new Set();
+
+function isManager(){ return staffRole === '大樹'; }
+
+const listEl      = document.getElementById('list');
+const composeArea = document.getElementById('composeArea');
+const inboxEl     = document.getElementById('inboxArea');
+const plantArea   = document.getElementById('plantArea');
+const toastEl     = document.getElementById('toast');
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbxC2G0k7Uql7bQcE_G_emtT7jRj7KwgMDx2MtXJwsVnyDsWCGBUDkoEWxqltZBbk6x1Tw/exec';
+
+// ───── Utilities ─────
+function showToast(msg){ toastEl.textContent=msg; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'),1800); }
+function escapeHtml(str){ const d=document.createElement('div'); d.textContent=str; return d.innerHTML; }
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function fmtDate(s){
+  if(!s) return '';
+  const str=String(s);
+  if(/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0,10);
+  const d=new Date(str);
+  if(!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return str;
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
+async function postToSheet(payload){
+  try{
+    await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+    return true;
+  }catch(e){ showToast('連線失敗，請重試'); return false; }
+}
+
+// ───── Tab ─────
+function switchTab(tab){
+  activeTab = tab;
+  document.getElementById('diarySection').style.display  = tab==='diary'  ? '' : 'none';
+  document.getElementById('publicSection').style.display = tab==='public' ? '' : 'none';
+  document.getElementById('tabDiary').classList.toggle('active', tab==='diary');
+  document.getElementById('tabPublic').classList.toggle('active', tab==='public');
+  if(tab==='public') renderPublicBoard();
+}
+
+// ───── Load ─────
+async function loadMyEntries(){
+  try{ const r=await fetch(`${API_URL}?action=myEntries&account=${encodeURIComponent(staffAccount)}`); const d=await r.json(); entries=(d.entries||[]).slice().reverse(); }
+  catch(e){ entries=[]; showToast('讀取失敗'); }
+}
+async function loadAllEntries(){
+  try{ const r=await fetch(`${API_URL}?action=allEntries&account=${encodeURIComponent(staffAccount)}`); const d=await r.json(); entries=(d.entries||[]).slice().reverse(); }
+  catch(e){ entries=[]; showToast('讀取失敗'); }
+}
+async function loadStaffList(){
+  try{ const r=await fetch(`${API_URL}?action=staffList&account=${encodeURIComponent(staffAccount)}`); const d=await r.json(); staffList=d.staff||[]; }
+  catch(e){ staffList=[]; }
+}
+async function loadInbox(){
+  try{ const r=await fetch(`${API_URL}?action=inbox&account=${encodeURIComponent(staffAccount)}`); const d=await r.json(); inboxMessages=(d.messages||[]).slice().reverse(); }
+  catch(e){ inboxMessages=[]; }
+}
+async function loadThreadData(){
+  try{
+    const r=await fetch(`${API_URL}?action=myThreads&account=${encodeURIComponent(staffAccount)}`);
+    const d=await r.json();
+    threadData={};
+    (d.messages||[]).forEach(m=>{ if(!threadData[m.threadId]) threadData[m.threadId]=[]; threadData[m.threadId].push(m); });
+  }catch(e){ threadData={}; }
+}
+async function loadPublicData(){
+  try{
+    const [rp,rt] = await Promise.all([
+      fetch(`${API_URL}?action=publicBoard&account=${encodeURIComponent(staffAccount)}`).then(r=>r.json()),
+      fetch(`${API_URL}?action=publicThreads&account=${encodeURIComponent(staffAccount)}`).then(r=>r.json())
+    ]);
+    publicPosts=(rp.posts||[]).slice().reverse();
+    pubThreadData={};
+    (rt.messages||[]).forEach(m=>{ if(!pubThreadData[m.threadId]) pubThreadData[m.threadId]=[]; pubThreadData[m.threadId].push(m); });
+  }catch(e){ publicPosts=[]; pubThreadData={}; }
+}
+
+// ───── Auth ─────
+async function staffLogin(){
+  const account=document.getElementById('loginAccount').value.trim();
+  if(!account){ showToast('請輸入帳號'); return; }
+  try{
+    const r=await fetch(`${API_URL}?action=login&account=${encodeURIComponent(account)}`);
+    const d=await r.json();
+    if(d.success){
+      staffLoggedIn=true; staffAuthor=d.name; staffAccount=d.account; staffRole=d.role||'小樹苗';
+      showToast(isManager()?'大樹登入成功 🌳':'登入成功 🌱');
+      if(isManager()) await Promise.all([loadAllEntries(),loadStaffList(),loadThreadData()]);
+      else await Promise.all([loadMyEntries(),loadInbox(),loadThreadData()]);
+      document.getElementById('tabRow').classList.add('visible');
+      render();
+    } else showToast('帳號不正確');
+  }catch(e){ showToast('連線失敗，請重試'); }
+}
+function testLogin(){
+  testMode=true; staffLoggedIn=true; staffAuthor='測試小樹苗'; staffAccount='TEST'; entries=[]; staffRole='小樹苗';
+  document.getElementById('tabRow').classList.add('visible');
+  showToast('已進入測試模式'); render();
+}
+function staffLogout(){
+  staffLoggedIn=false; staffAuthor=''; staffAccount=''; staffRole=''; testMode=false;
+  entries=[]; inboxMessages=[]; staffList=[]; publicPosts=[]; threadData={}; pubThreadData={};
+  filterAuthor='all'; filterStatus='all'; expandedThreads=new Set(); activeTab='diary';
+  document.getElementById('tabRow').classList.remove('visible');
+  switchTab('diary'); render();
+}
+
+// ───── Thread UI ─────
+function getThreadMsgs(id, isPublic){ return (isPublic ? pubThreadData[id] : threadData[id]) || []; }
+
+function threadCount(entry){
+  const tMsgs = getThreadMsgs(entry.id, false);
+  return (entry.reply ? 1 : 0) + tMsgs.length;
+}
+
+function renderThreadPanel(threadId, containerEl, isPublic, canReply){
+  const tMsgs = getThreadMsgs(threadId, isPublic);
+  // If diary entry, find legacy reply from entries list
+  const entry = !isPublic ? entries.find(e=>e.id===threadId) : null;
+
+  let html = '<div class="thread-panel" id="thread-'+escapeHtml(threadId)+'">';
+
+  // Legacy reply as first bubble
+  if(entry && entry.reply){
+    const isMine = isManager() && entry.replyBy === staffAuthor;
+    const side = isMine ? 'by-me' : 'by-other';
+    html += `
+      <div class="thread-msg ${side}">
+        <div class="thread-who ${side}">${escapeHtml(entry.replyBy||'大樹')}</div>
+        <div class="thread-bubble ${side}">${escapeHtml(entry.reply)}</div>
+        <div class="thread-time ${side}">${fmtDate(entry.repliedAt)}</div>
+      </div>`;
+  }
+
+  // 對話紀錄 messages
+  tMsgs.forEach(m=>{
+    const isMine = m.fromAccount.toUpperCase() === staffAccount.toUpperCase();
+    const side = isMine ? 'by-me' : 'by-other';
+    html += `
+      <div class="thread-msg ${side}">
+        <div class="thread-who ${side}">${escapeHtml(m.fromName)}</div>
+        <div class="thread-bubble ${side}">${escapeHtml(m.content)}</div>
+        <div class="thread-time ${side}">${fmtDate(m.createdAt)}</div>
+      </div>`;
+  });
+
+  if(canReply){
+    html += `
+      <div class="thread-input-row">
+        <textarea id="tinput-${escapeHtml(threadId)}" placeholder="回覆..." rows="1"></textarea>
+        <button onclick="sendReply('${escapeHtml(threadId)}',${isPublic})">送出</button>
+      </div>`;
+  }
+
+  html += '</div>';
+  containerEl.insertAdjacentHTML('beforeend', html);
+
+  // Auto-resize textarea
+  const ta = document.getElementById('tinput-'+threadId);
+  if(ta){
+    ta.addEventListener('input', ()=>{
+      ta.style.height='auto';
+      ta.style.height=Math.min(ta.scrollHeight,100)+'px';
+    });
+  }
+}
+
+async function sendReply(threadId, isPublic){
+  const ta = document.getElementById('tinput-'+threadId);
+  if(!ta) return;
+  const content = ta.value.trim();
+  if(!content){ showToast('請先寫內容'); return; }
+  const id = uid();
+  const ok = await postToSheet({ action:'addReply', threadId, account:staffAccount, content, id, createdAt:new Date().toISOString() });
+  if(ok){
+    const newMsg = { id, threadId, fromName:staffAuthor, fromAccount:staffAccount, content, createdAt:new Date().toISOString() };
+    if(isPublic){
+      if(!pubThreadData[threadId]) pubThreadData[threadId]=[];
+      pubThreadData[threadId].push(newMsg);
+    } else {
+      if(!threadData[threadId]) threadData[threadId]=[];
+      threadData[threadId].push(newMsg);
+    }
+    ta.value='';
+    // re-render thread panel
+    const old = document.getElementById('thread-'+threadId);
+    if(old){
+      const parent = old.parentElement;
+      old.remove();
+      const canReply = staffLoggedIn;
+      renderThreadPanel(threadId, parent, isPublic, canReply);
+    }
+    showToast('已送出 🌿');
+  }
+}
+
+function toggleThread(threadId, btnEl, containerEl, isPublic, canReply){
+  if(expandedThreads.has(threadId)){
+    expandedThreads.delete(threadId);
+    const panel = document.getElementById('thread-'+threadId);
+    if(panel) panel.remove();
+    btnEl.textContent = threadBtnText(threadId, isPublic);
+    btnEl.classList.toggle('has-msgs', getThreadMsgs(threadId,isPublic).length>0||(!isPublic&&(entries.find(e=>e.id===threadId)||{}).reply));
+  } else {
+    expandedThreads.add(threadId);
+    renderThreadPanel(threadId, containerEl, isPublic, canReply);
+    btnEl.textContent = '▲ 收起對話';
+  }
+}
+
+function threadBtnText(threadId, isPublic){
+  const msgs = getThreadMsgs(threadId, isPublic);
+  const entry = !isPublic ? entries.find(e=>e.id===threadId) : null;
+  const cnt = msgs.length + (entry&&entry.reply?1:0);
+  return cnt>0 ? `💬 對話 (${cnt})` : '💬 開始對話';
+}
+
+// ───── Plant visuals ─────
+function speciesDef(idx){
+  const list=[
+    {name:'嫩芽小樹',leaf:'#8fc47a',leafLight:'#9ed184',stem:'#5f9650',topper:'leaf'},
+    {name:'竹之子',leaf:'#7bbf8a',leafLight:'#9fd9ac',stem:'#4c8f5e',topper:'bamboo'},
+    {name:'小向日葵',leaf:'#8fc47a',leafLight:'#f4dd9e',stem:'#5f9650',topper:'sunflower'},
+    {name:'幸運草叢',leaf:'#6fae80',leafLight:'#8ecb9e',stem:'#4a7d5c',topper:'clover'},
+    {name:'櫻花小徑',leaf:'#8fc47a',leafLight:'#f3bcc8',stem:'#5f9650',topper:'blossom'},
+    {name:'豐收果樹',leaf:'#7fb968',leafLight:'#9ed184',stem:'#7a5a3a',topper:'fruit'}
+  ];
+  return list[idx%list.length];
+}
+function stageFromFraction(f){ if(f<=0.02)return 0; if(f<0.2)return 1; if(f<0.4)return 2; if(f<0.65)return 3; if(f<0.9)return 4; return 5; }
+function drawTopper(sp,x,y){
+  let s='';
+  if(sp.topper==='bamboo'){
+    s+=`<path d="M${x} ${y+45} L${x} ${y-10}" stroke="${sp.stem}" stroke-width="7" stroke-linecap="round" fill="none"/>`;
+    [10,25,38].forEach(off=>{ s+=`<path d="M${x-6} ${y+45-off} L${x+6} ${y+45-off}" stroke="${sp.leafLight}" stroke-width="3" stroke-linecap="round"/>`; });
+    s+=`<ellipse cx="${x-8}" cy="${y-14}" rx="9" ry="3" fill="${sp.leaf}" transform="rotate(-20 ${x-8} ${y-14})"/>`;
+    s+=`<ellipse cx="${x+8}" cy="${y-16}" rx="9" ry="3" fill="${sp.leaf}" transform="rotate(20 ${x+8} ${y-16})"/>`;
+  } else if(sp.topper==='sunflower'){
+    s+=`<path d="M${x} ${y+45} L${x} ${y-2}" stroke="${sp.stem}" stroke-width="6" stroke-linecap="round" fill="none"/>`;
+    for(let a=0;a<8;a++){const ang=a*Math.PI/4;const px=x+Math.cos(ang)*15,py=(y-14)+Math.sin(ang)*15;s+=`<ellipse cx="${px}" cy="${py}" rx="6" ry="3.5" fill="${sp.leafLight}" transform="rotate(${a*45} ${px} ${py})">`+'</ellipse>';}
+    s+=`<circle cx="${x}" cy="${y-14}" r="9" fill="#8a5d34"/>`;
+  } else if(sp.topper==='clover'){
+    s+=`<path d="M${x} ${y+45} L${x} ${y+10}" stroke="${sp.stem}" stroke-width="6" stroke-linecap="round" fill="none"/>`;
+    [[x-14,y+2],[x+14,y+2],[x,y-14],[x-10,y-24],[x+10,y-24]].forEach(([cx,cy])=>{s+=`<circle cx="${cx-4}" cy="${cy}" r="6" fill="${sp.leaf}"/><circle cx="${cx+4}" cy="${cy}" r="6" fill="${sp.leafLight}"/><circle cx="${cx}" cy="${cy-5}" r="6" fill="${sp.leaf}"/>`;});
+  } else if(sp.topper==='blossom'){
+    s+=`<path d="M${x} ${y+45} L${x} ${y-6}" stroke="${sp.stem}" stroke-width="7" stroke-linecap="round" fill="none"/>`;
+    s+=`<circle cx="${x}" cy="${y-16}" r="20" fill="${sp.leaf}"/><circle cx="${x-16}" cy="${y-2}" r="12" fill="${sp.leafLight}"/><circle cx="${x+16}" cy="${y-2}" r="12" fill="${sp.leafLight}"/><circle cx="${x}" cy="${y-32}" r="12" fill="${sp.leafLight}"/>`;
+    [[-10,-14],[10,-10],[0,-28],[-14,-2],[14,-4]].forEach(([dx,dy])=>{ s+=`<circle cx="${x+dx}" cy="${y+dy}" r="2.2" fill="#e79cb0"/>`; });
+  } else if(sp.topper==='fruit'){
+    s+=`<path d="M${x} ${y+45} L${x} ${y-4}" stroke="${sp.stem}" stroke-width="8" stroke-linecap="round" fill="none"/>`;
+    s+=`<circle cx="${x}" cy="${y-16}" r="22" fill="${sp.leaf}"/><circle cx="${x-15}" cy="${y-2}" r="13" fill="${sp.leafLight}"/><circle cx="${x+15}" cy="${y-2}" r="13" fill="${sp.leafLight}"/>`;
+    [[-9,-10],[10,-14],[-2,-26],[13,4],[-15,6]].forEach(([dx,dy])=>{ s+=`<circle cx="${x+dx}" cy="${y+dy}" r="3" fill="#d9694a"/>`; });
+  } else {
+    s+=`<path d="M${x} ${y+45} L${x} ${y-8}" stroke="${sp.stem}" stroke-width="7" stroke-linecap="round" fill="none"/>`;
+    s+=`<circle cx="${x}" cy="${y-18}" r="20" fill="${sp.leaf}"/><circle cx="${x-16}" cy="${y-4}" r="13" fill="${sp.leafLight}"/><circle cx="${x+16}" cy="${y-4}" r="13" fill="${sp.leafLight}"/>`;
+  }
+  return s;
+}
+function drawPlant(fraction,sp){
+  const stage=stageFromFraction(fraction);
+  let s=`<ellipse cx="60" cy="128" rx="40" ry="9" fill="#c8a877"/><ellipse cx="60" cy="125" rx="34" ry="7" fill="#a9835f"/>`;
+  if(stage===0){ s+=`<ellipse cx="60" cy="118" rx="7" ry="5" fill="#d9b877"/><ellipse cx="58" cy="116" rx="2" ry="1.5" fill="#f4dd9e"/>`; }
+  else if(stage===1){ s+=`<path d="M60 122 L60 105" stroke="${sp.stem}" stroke-width="4" stroke-linecap="round" fill="none"/><ellipse cx="52" cy="102" rx="9" ry="6" fill="${sp.leaf}" transform="rotate(-25 52 102)"/><ellipse cx="68" cy="102" rx="9" ry="6" fill="${sp.leaf}" transform="rotate(25 68 102)"/>`; }
+  else if(stage===2){ s+=`<path d="M60 122 L60 80" stroke="${sp.stem}" stroke-width="5" stroke-linecap="round" fill="none"/><ellipse cx="48" cy="100" rx="11" ry="7" fill="${sp.leaf}" transform="rotate(-30 48 100)"/><ellipse cx="72" cy="100" rx="11" ry="7" fill="${sp.leaf}" transform="rotate(30 72 100)"/><ellipse cx="46" cy="82" rx="10" ry="6" fill="${sp.leafLight}" transform="rotate(-20 46 82)"/><ellipse cx="74" cy="82" rx="10" ry="6" fill="${sp.leafLight}" transform="rotate(20 74 82)"/>`; }
+  else if(stage===3){ s+=`<path d="M60 122 L60 60" stroke="${sp.stem}" stroke-width="6" stroke-linecap="round" fill="none"/><path d="M60 95 L40 85" stroke="${sp.stem}" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M60 80 L82 70" stroke="${sp.stem}" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="60" cy="58" r="16" fill="${sp.leaf}"/><circle cx="38" cy="83" r="10" fill="${sp.leafLight}"/><circle cx="84" cy="68" r="10" fill="${sp.leafLight}"/>`; }
+  else { s+=drawTopper(sp,60,78); }
+  return s;
+}
+function addMonths(date,n){ const d=new Date(date.getTime()); d.setMonth(d.getMonth()+n); return d; }
+function daysBetween(a,b){ return Math.floor((b.setHours(0,0,0,0)-a.setHours(0,0,0,0))/86400000); }
+
+function renderPlantRow(){
+  if(!staffLoggedIn){ plantArea.innerHTML=`<div class="plant-intro">🔑 登入後可以看到你的 6 顆小樹苗</div>`; return; }
+  if(entries.length===0){ plantArea.innerHTML=`<div class="plant-intro">🌱 寫下第一篇留言，展開你的 6 個月小樹苗旅程！</div>`; return; }
+  const dates=entries.map(e=>new Date(e.entryDate||e.createdAt)).filter(d=>!isNaN(d));
+  const startDate=new Date(Math.min(...dates.map(d=>d.getTime())));
+  const today=new Date();
+  let html='<div class="plant-row">';
+  for(let m=1;m<=6;m++){
+    const mStart=addMonths(startDate,m-1), mEnd=addMonths(startDate,m);
+    const totalDays=Math.max(1,daysBetween(new Date(mStart),new Date(mEnd)));
+    const sp=speciesDef(m-1);
+    if(today<mStart){
+      html+=`<div class="plant-slot locked"><svg viewBox="0 0 120 140" width="56" height="64"><ellipse cx="60" cy="128" rx="40" ry="9" fill="#ddd6c4"/><ellipse cx="60" cy="118" rx="7" ry="5" fill="#c9c2ae"/></svg><div class="m-label">第${m}個月</div><div class="m-status">尚未開始</div></div>`;
+    } else {
+      const elapsed=Math.min(totalDays,Math.max(0,daysBetween(new Date(mStart),new Date(today)))+1);
+      const fraction=today>=mEnd?1:elapsed/totalDays;
+      html+=`<div class="plant-slot grow-in"><svg viewBox="0 0 120 140" width="56" height="64">${drawPlant(fraction,sp)}</svg><div class="m-label">第${m}個月</div><div class="m-status">${today>=mEnd?'已完成 🎉':`第 ${elapsed}/${totalDays} 天`}</div></div>`;
+    }
+  }
+  html+='</div>';
+  plantArea.innerHTML=html;
+}
+
+// ───── Entry card builder ─────
+function buildEntryCard(e, i, opts){
+  // opts: { showAuthor, showReplyEdit, canThread }
+  const tapeClass='tape-'+(i%4);
+  const cnt = threadCount(e);
+  const hasMsgs = cnt>0;
+  const btnText = hasMsgs ? `💬 對話 (${cnt})` : '💬 開始對話';
+  const statusBadge = e.reply || (threadData[e.id]&&threadData[e.id].length)
+    ? `<span class="status-badge done">✓ 有回覆</span>`
+    : `<span class="status-badge wait">⏳ 待回覆</span>`;
+
+  return `
+    <div class="entry ${tapeClass}" id="entry-${escapeHtml(e.id)}">
+      <div class="entry-head">
+        <span class="who">${escapeHtml(opts.showAuthor ? e.author : staffAuthor)}</span>
+        <span class="when">${fmtDate(e.entryDate)}</span>
+      </div>
+      <div class="entry-body">${escapeHtml(e.content)}</div>
+      <div class="status-row">${statusBadge}</div>
+      <button class="thread-toggle${hasMsgs?' has-msgs':''}" id="tbtn-${escapeHtml(e.id)}"
+        onclick="handleThreadToggle('${escapeHtml(e.id)}',false,${opts.canThread})">${btnText}</button>
+    </div>`;
+}
+
+function handleThreadToggle(threadId, isPublic, canReply){
+  const btn = document.getElementById('tbtn-'+threadId);
+  const container = btn ? btn.parentElement : null;
+  if(!container) return;
+  toggleThread(threadId, btn, container, isPublic, canReply);
+}
+
+// ───── Manager view ─────
+function renderManagerView(){
+  const authors=[...new Set(entries.map(e=>e.author))].sort();
+  composeArea.innerHTML=`
+    <div class="compose">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13.5px;font-weight:700;">🌳 ${escapeHtml(staffAuthor)}（大樹）</span>
+        <button id="logoutBtn" style="border:none;background:none;color:var(--ink-soft);font-size:12px;text-decoration:underline;cursor:pointer;">登出</button>
+      </div>
+      <div class="filter-bar">
+        <select id="authorFilter">
+          <option value="all">全部小樹苗</option>
+          ${authors.map(a=>`<option value="${escapeHtml(a)}"${filterAuthor===a?' selected':''}>${escapeHtml(a)}</option>`).join('')}
+        </select>
+        <button class="filter-btn${filterStatus==='all'?' active':''}" data-status="all">全部</button>
+        <button class="filter-btn${filterStatus==='replied'?' active':''}" data-status="replied">已回覆</button>
+        <button class="filter-btn${filterStatus==='unreplied'?' active':''}" data-status="unreplied">未回覆</button>
+      </div>
+      <div style="margin-top:12px;">
+        <button id="toggleSendMsg" style="width:100%;border:1.5px dashed var(--stamp);background:var(--stamp-bg);color:var(--stamp);padding:8px 0;border-radius:12px;font-size:12.5px;font-weight:700;cursor:pointer;">✉️ 傳訊息給小樹苗</button>
+        <div id="sendMsgPanel" style="display:none;margin-top:10px;">
+          <label style="display:block;font-size:11.5px;color:var(--ink-soft);font-weight:700;margin-bottom:5px;">收件者</label>
+          <select id="msgTo" style="width:100%;border:1.5px solid var(--paper-line);border-radius:10px;padding:7px 10px;font-size:13px;background:#fff;color:var(--ink);margin-bottom:10px;">
+            <option value="">請選擇小樹苗...</option>
+            ${staffList.map(s=>`<option value="${escapeHtml(s.account)}">${escapeHtml(s.name)}</option>`).join('')}
+          </select>
+          <textarea id="msgContent" placeholder="寫下你想說的話..." style="width:100%;border:1.5px solid var(--paper-line);border-radius:10px;padding:10px;font-family:inherit;font-size:13.5px;color:var(--ink);background:#fff;resize:vertical;min-height:72px;margin-bottom:10px;"></textarea>
+          <button id="sendMsgBtn" style="width:100%;border:2px solid var(--stamp);background:var(--stamp);color:#fff;padding:9px 0;border-radius:16px;font-size:13px;font-weight:700;cursor:pointer;">🌳 送出訊息</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('logoutBtn').onclick=staffLogout;
+  document.getElementById('authorFilter').onchange=ev=>{filterAuthor=ev.target.value;renderManagerView();};
+  document.querySelectorAll('.filter-btn').forEach(btn=>{ btn.onclick=()=>{filterStatus=btn.dataset.status;renderManagerView();}; });
+  document.getElementById('toggleSendMsg').onclick=()=>{ const p=document.getElementById('sendMsgPanel'); p.style.display=p.style.display==='none'?'block':'none'; };
+  document.getElementById('sendMsgBtn').onclick=sendPrivateMessage;
+
+  const filtered=entries.filter(e=>{
+    if(filterAuthor!=='all'&&e.author!==filterAuthor) return false;
+    const hasReply=e.reply||(threadData[e.id]&&threadData[e.id].length);
+    if(filterStatus==='replied'&&!hasReply) return false;
+    if(filterStatus==='unreplied'&&hasReply) return false;
+    return true;
+  });
+
+  if(filtered.length===0){ listEl.innerHTML=`<div class="empty-hint"><span class="big">🍃</span>目前還沒有留言。</div>`; return; }
+  listEl.innerHTML=filtered.map((e,i)=>buildEntryCard(e,i,{showAuthor:true,canThread:true})).join('');
+}
+
+// ───── 小樹苗 compose + list ─────
+function renderComposeArea(){
+  if(!staffLoggedIn){
+    composeArea.innerHTML=`
+      <div class="compose">
+        <label>帳號</label>
+        <input id="loginAccount" type="text" placeholder="請輸入你的帳號（例如：MIN）">
+        <button class="submit" id="loginBtn">🔑 登入</button>
+        <button id="testLoginBtn" style="width:100%;margin-top:10px;border:none;background:none;color:var(--ink-soft);font-size:12px;text-decoration:underline;cursor:pointer;">🧪 先不接帳密，直接看介面</button>
+      </div>`;
+    document.getElementById('loginBtn').onclick=staffLogin;
+    document.getElementById('testLoginBtn').onclick=testLogin;
+  } else {
+    composeArea.innerHTML=`
+      <div class="compose">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <span style="font-size:13.5px;font-weight:700;">🌱 ${escapeHtml(staffAuthor)}</span>
+          <button id="logoutBtn" style="border:none;background:none;color:var(--ink-soft);font-size:12px;text-decoration:underline;cursor:pointer;">登出</button>
+        </div>
+        <label>日期</label>
+        <input id="entryDateInput" type="date" value="${todayStr()}">
+        <label>小樹苗的話</label>
+        <textarea id="contentInput" placeholder="今天想說的話、遇到的事，都可以寫在這裡..."></textarea>
+        <button class="submit" id="submitBtn">✒️ 送出</button>
+      </div>`;
+    document.getElementById('submitBtn').onclick=submitEntry;
+    document.getElementById('logoutBtn').onclick=staffLogout;
+  }
+}
+
+function renderInbox(){
+  if(!inboxEl) return;
+  if(!staffLoggedIn||isManager()||inboxMessages.length===0){ inboxEl.innerHTML=''; return; }
+  let html=`<div style="margin-bottom:16px;"><div style="font-size:11.5px;font-weight:700;color:var(--stamp);margin-bottom:10px;">🌳 大樹的話</div>`;
+  inboxMessages.forEach(msg=>{
+    const cnt=(threadData[msg.id]||[]).length;
+    const hasMsgs=cnt>0;
+    const btnText=hasMsgs?`💬 對話 (${cnt})`:'💬 回覆';
+    html+=`
+      <div class="inbox-msg" id="entry-${escapeHtml(msg.id)}">
+        <div class="inbox-from">來自大樹 ${escapeHtml(msg.fromName)}</div>
+        <div class="inbox-text">${escapeHtml(msg.content)}</div>
+        <div class="inbox-date">${fmtDate(msg.createdAt)}</div>
+        <button class="thread-toggle${hasMsgs?' has-msgs':''}" id="tbtn-${escapeHtml(msg.id)}"
+          style="margin:8px 0 0;"
+          onclick="handleThreadToggle('${escapeHtml(msg.id)}',false,true)">${btnText}</button>
+      </div>`;
+  });
+  html+='</div>';
+  inboxEl.innerHTML=html;
+}
+
+function renderList(){
+  if(!staffLoggedIn){ listEl.innerHTML=`<div class="empty-hint"><span class="big">🔑</span>登入後才能看到你的留言。</div>`; return; }
+  if(entries.length===0){ listEl.innerHTML=`<div class="empty-hint"><span class="big">🌱</span>你還沒有留言，寫下今天的第一則吧。</div>`; return; }
+  listEl.innerHTML=entries.map((e,i)=>buildEntryCard(e,i,{showAuthor:false,canThread:true})).join('');
+}
+
+async function submitEntry(){
+  const dateInput=document.getElementById('entryDateInput');
+  const contentInput=document.getElementById('contentInput');
+  const entryDate=dateInput.value||todayStr();
+  const content=contentInput.value.trim();
+  if(!content){ showToast('請填寫內容'); return; }
+  const entry={id:uid(),author:staffAuthor,entryDate,content,createdAt:new Date().toISOString(),reply:'',repliedAt:'',replyBy:''};
+  if(testMode){ entries.unshift(entry); contentInput.value=''; showToast('已送出 🌱'); render(); return; }
+  const ok=await postToSheet({action:'add',id:entry.id,account:staffAccount,entryDate,content:entry.content,createdAt:entry.createdAt});
+  if(ok){ entries.unshift(entry); contentInput.value=''; showToast('已送出，小樹苗長大了一點 🌱'); render(); }
+}
+
+async function sendPrivateMessage(){
+  const toEl=document.getElementById('msgTo');
+  const contentEl=document.getElementById('msgContent');
+  if(!toEl||!contentEl) return;
+  const toAccount=toEl.value, content=contentEl.value.trim();
+  if(!toAccount){ showToast('請選擇收件小樹苗'); return; }
+  if(!content){ showToast('請填寫訊息內容'); return; }
+  const id=uid();
+  const ok=await postToSheet({action:'sendMessage',fromAccount:staffAccount,toAccount,content,id,createdAt:new Date().toISOString()});
+  if(ok){ contentEl.value=''; document.getElementById('sendMsgPanel').style.display='none'; showToast('訊息已送出 🌳'); }
+}
+
+// ───── Public board ─────
+function drawPublicTree(){
+  // Simple big tree SVG for the public board header
+  return `<svg viewBox="0 0 200 160" width="160" height="128" style="display:inline-block;vertical-align:middle;">
+    <!-- Tree -->
+    <ellipse cx="80" cy="148" rx="50" ry="10" fill="#c8a877"/>
+    <ellipse cx="80" cy="145" rx="42" ry="8" fill="#a9835f"/>
+    <path d="M80 140 L80 60" stroke="#7a5a3a" stroke-width="10" stroke-linecap="round" fill="none"/>
+    <path d="M80 110 L50 90" stroke="#7a5a3a" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <path d="M80 90 L112 75" stroke="#7a5a3a" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <circle cx="80" cy="48" r="36" fill="#5f9650"/>
+    <circle cx="52" cy="68" r="22" fill="#8fc47a"/>
+    <circle cx="110" cy="62" r="22" fill="#8fc47a"/>
+    <circle cx="80" cy="30" r="18" fill="#7fb968"/>
+    <!-- Dog -->
+    <ellipse cx="148" cy="145" rx="18" ry="10" fill="#d9b877"/>
+    <ellipse cx="134" cy="136" rx="12" ry="9" fill="#d9b877"/>
+    <circle cx="128" cy="131" r="7" fill="#c8a240"/>
+    <ellipse cx="125" cy="128" rx="3" ry="4" fill="#c8a240" transform="rotate(-20 125 128)"/>
+    <circle cx="123" cy="126" r="1.5" fill="#7a5a3a"/>
+    <ellipse cx="131" cy="124" rx="4" ry="6" fill="#c8a240" transform="rotate(15 131 124)"/>
+    <ellipse cx="155" cy="145" rx="5" ry="3" fill="#c8a240" transform="rotate(30 155 145)"/>
+    <path d="M160 138 Q165 132 162 128" stroke="#c8a240" stroke-width="3" stroke-linecap="round" fill="none"/>
+    <circle cx="121" cy="128" r="1" fill="#7a5a3a"/>
+  </svg>`;
+}
+
+function renderPublicBoard(){
+  const treeEl=document.getElementById('pubTreeArea');
+  if(treeEl) treeEl.innerHTML=`<div style="padding:8px 0 4px;">${drawPublicTree()}<div style="font-family:'Fredoka',sans-serif;font-size:13px;color:var(--ink-soft);margin-top:4px;">公開留言板・大家一起聊</div></div>`;
+
+  const pubCompose=document.getElementById('pubCompose');
+  const pubList=document.getElementById('pubList');
+  if(!pubCompose||!pubList) return;
+
+  if(!staffLoggedIn){
+    pubCompose.innerHTML=`<div class="empty-hint"><span class="big">🔑</span>請先登入才能使用公開留言板。</div>`;
+    pubList.innerHTML=''; return;
+  }
+
+  pubCompose.innerHTML=`
+    <div class="pub-compose">
+      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;font-weight:600;">✏️ 分享給大家</div>
+      <textarea id="pubInput" placeholder="寫下想和大家分享的..."></textarea>
+      <button onclick="sendPublicPost()">🌳 公開留言</button>
+    </div>`;
+
+  if(publicPosts.length===0){
+    pubList.innerHTML=`<div class="empty-hint"><span class="big">🌿</span>還沒有公開留言，來第一個留言吧！</div>`;
+    return;
+  }
+
+  pubList.innerHTML=publicPosts.map((p,i)=>{
+    const tMsgs=pubThreadData[p.id]||[];
+    const cnt=tMsgs.length;
+    const hasMsgs=cnt>0;
+    const btnText=hasMsgs?`💬 對話 (${cnt})`:'💬 留言';
+    return `
+      <div class="pub-post" id="entry-${escapeHtml(p.id)}">
+        <div class="pub-head">
+          <span class="pub-who">${escapeHtml(p.fromName)}</span>
+          <span class="pub-when">${fmtDate(p.createdAt)}</span>
+        </div>
+        <div class="pub-body">${escapeHtml(p.content)}</div>
+        <button class="thread-toggle${hasMsgs?' has-msgs':''}" id="tbtn-${escapeHtml(p.id)}"
+          onclick="handlePubThreadToggle('${escapeHtml(p.id)}')">${btnText}</button>
+      </div>`;
+  }).join('');
+}
+
+function handlePubThreadToggle(threadId){
+  const btn=document.getElementById('tbtn-'+threadId);
+  const container=btn?btn.parentElement:null;
+  if(!container) return;
+  toggleThread(threadId,btn,container,true,staffLoggedIn);
+}
+
+async function sendPublicPost(){
+  const ta=document.getElementById('pubInput');
+  if(!ta) return;
+  const content=ta.value.trim();
+  if(!content){ showToast('請填寫內容'); return; }
+  const id=uid();
+  const ok=await postToSheet({action:'publicPost',account:staffAccount,content,id,createdAt:new Date().toISOString()});
+  if(ok){
+    publicPosts.unshift({id,fromName:staffAuthor,fromAccount:staffAccount,content,createdAt:new Date().toISOString()});
+    ta.value='';
+    showToast('已發布 🌳');
+    renderPublicBoard();
+  }
+}
+
+// ───── Render ─────
+function render(){
+  if(staffLoggedIn && isManager()){
+    plantArea.innerHTML='';
+    inboxEl.innerHTML='';
+    renderManagerView();
+    return;
+  }
+  renderPlantRow();
+  renderComposeArea();
+  renderInbox();
+  renderList();
+}
+
+// ───── Refresh ─────
+document.getElementById('btnRefresh').onclick=async()=>{
+  if(testMode){ showToast('測試模式，畫面本來就是最新的'); render(); return; }
+  if(staffLoggedIn){
+    if(isManager()) await Promise.all([loadAllEntries(),loadStaffList(),loadThreadData()]);
+    else await Promise.all([loadMyEntries(),loadInbox(),loadThreadData()]);
+    if(activeTab==='public') await loadPublicData();
+  }
+  expandedThreads=new Set();
+  showToast('已更新');
+  if(activeTab==='public') renderPublicBoard(); else render();
+};
+
+render();
+</script>
+</body>
+</html>
