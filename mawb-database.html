@@ -161,17 +161,30 @@ function warehouseDate(flightDate, dest){
 }
 function fmt(d){ return `${iso(d)}（${WEEK[d.getDay()]}）`; }
 
+// ===== 「訂位資料」衍生欄位（都從航班日 + 航班號算，不需另存後端）=====
+function flightDateObj(r){
+  if(!r || !/^\d{4}-\d{2}-\d{2}$/.test(r.flightDate||"")) return null;
+  const d = new Date(r.flightDate + "T00:00:00");
+  return isNaN(d) ? null : d;
+}
+function fltDateStr(r){ const d=flightDateObj(r); return r.flight ? `${r.flight}/${d?pad(d.getDate()):""}` : ""; } // MH367/04
+function monthAbbr(r){ const d=flightDateObj(r); return d ? MONTHS_ABBR[d.getMonth()] : ""; }                    // DEC
+function weekdayTW(r){ const d=flightDateObj(r); return d ? `(${WEEK[d.getDay()]})` : ""; }                       // (二)
+
 // ===== 解析 =====
 // 月份縮寫 → 月 index(0-11)，用來吃 "01OCT" 這種航空標準日期格式
 const MONTH_ABBR = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
 // MAWB 開頭 → 目的地（班表沒附目的地代碼時用來自動帶）
-const PREFIX_DEST = { "843":"KUL", "189":"KUL", "297":"KUL", "695":"KUL" };
+const PREFIX_DEST = { "843":"KUL", "189":"KUL", "232":"KUL", "297":"KUL", "695":"KUL" };
+// 月份縮寫（0-11 對應），匯出 MONTH 欄用
+const MONTHS_ABBR = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
-// 容忍三種格式（第 4 段彈性）：
+// 容忍這些格式（第 4 段彈性、航班號可帶橫線）：
 //   843-46243455 D7379/01OCT    日+月黏在一起、無目的地 ← 實際航空公司給的格式
+//   232-18403571 MH367/04       日（無月份無目的地）
+//   189-05260474 JX-725/03      航班號帶橫線
 //   843-46137836 D7379/01 KUL   日 + 目的地代碼
-//   843-46137836 D7379/01       只有日
-const LINE_RE = /(\d{3}-\d{8})\s+([A-Z0-9]+)\/(\d{1,2})\s*([A-Z]{3})?/;
+const LINE_RE = /(\d{3}-\d{8})\s+([A-Z0-9][A-Z0-9-]*)\/(\d{1,2})\s*([A-Z]{3})?/;
 
 // 有明確月份（OCT）時推年份：預設今年，若該日期已過超過半年視為明年（處理 12 月貼 1 月班表）
 function yearForMonth(monthIdx, day){
@@ -347,15 +360,18 @@ function renderDB(){
     return `<tr>
       <td class="warehouse">${r.warehouse||""}</td>
       <td>${r.mawb}</td>
-      <td>${r.flight}</td>
+      <td>${fltDateStr(r)}</td>
+      <td>${monthAbbr(r)}</td>
+      <td>${weekdayTW(r)}</td>
       <td><span class="${destBadge}">${r.dest}</span></td>
       <td>${r.flightDate||""}</td>
       <td><button class="btn btn-ghost btn-sm" onclick="delRow('${r.mawb}')">刪除</button></td>
     </tr>`;
   }).join("");
   $("dbWrap").innerHTML = `<div class="pill" style="margin-bottom:10px">共 ${rows.length} 筆</div>
-    <table><thead><tr><th>進倉日</th><th>MAWB</th><th>航班</th><th>目的</th><th>航班日</th><th></th></tr></thead>
-    <tbody>${body}</tbody></table>`;
+    <table><thead><tr><th>進倉日</th><th>MAWB</th><th>FLT/DATE</th><th>MONTH</th><th>星期</th><th>目的</th><th>航班日</th><th></th></tr></thead>
+    <tbody>${body}</tbody></table>
+    <div class="note">匯出 Excel 會多 PC/WT、W/H、備註 三欄（留白讓你自己填）。</div>`;
 }
 
 window.delRow = async function(mawb){
@@ -372,7 +388,7 @@ $("parseBtn").addEventListener("click", ()=>{
   const text = $("rawInput").value;
   const [y,mo] = $("baseMonth").value.split("-").map(Number);
   pending = parseRaw(text, y, mo);
-  if(!pending.length){ alert("沒有解析到任何班表資料。\n支援格式（擇一）：\n  843-46243455 D7379/01OCT\n  843-46137836 D7379/01 KUL\n  843-46137836 D7379/01"); $("previewCard").style.display="none"; return; }
+  if(!pending.length){ alert("沒有解析到任何班表資料。\n支援格式（擇一）：\n  843-46243455 D7379/01OCT\n  232-18403571 MH367/04\n  189-05260474 JX-725/03\n  843-46137836 D7379/01 KUL"); $("previewCard").style.display="none"; return; }
   renderPreview();
 });
 
@@ -424,17 +440,25 @@ $("exportBtn").addEventListener("click", async ()=>{
   try{ await fetchDB(); }catch(err){ alert("無法取得最新雲端資料：" + err.message); return; }
   const db = loadDB();
   if(!db.length){ alert("資料庫是空的，沒有東西可匯出。"); return; }
-  const rows = db.slice().sort((a,b)=> (a.warehouse||"").localeCompare(b.warehouse||"") || a.mawb.localeCompare(b.mawb))
+  // 匯出成「訂位資料」欄位；能算的自動帶，PC/WT、W/H、備註 留白讓你自己填
+  const rows = db.slice().sort((a,b)=> (a.flightDate||"").localeCompare(b.flightDate||"") || a.mawb.localeCompare(b.mawb))
     .map(r=>({
-      "進倉日": r.warehouse, "MAWB": r.mawb, "航班號": r.flight,
-      "目的地": r.dest, "航班日": r.flightDate
+      "進倉日": r.warehouse||"",
+      "MAWB No": r.mawb,
+      "FLT/DATE": fltDateStr(r),
+      "MONTH": monthAbbr(r),
+      "DATE": weekdayTW(r),
+      "DEST": r.dest,
+      "PC/WT": "",
+      "W/H": "",
+      "備註": ""
     }));
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws["!cols"] = [{wch:12},{wch:16},{wch:10},{wch:8},{wch:12}];
+  ws["!cols"] = [{wch:12},{wch:16},{wch:12},{wch:7},{wch:7},{wch:7},{wch:12},{wch:14},{wch:16}];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, currentCountry || "MAWB");
+  XLSX.utils.book_append_sheet(wb, ws, COUNTRY_NAME[currentCountry] || currentCountry || "MAWB");
   const today = iso(new Date());
-  XLSX.writeFile(wb, `${today}_MAWB班表_${COUNTRY_NAME[currentCountry]||""}.xlsx`);
+  XLSX.writeFile(wb, `${today}_訂位資料_${COUNTRY_NAME[currentCountry]||""}.xlsx`);
 });
 
 // 國別選擇
