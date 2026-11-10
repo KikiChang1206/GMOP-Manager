@@ -140,8 +140,11 @@ const HOLIDAYS = new Set([
   "2026-10-09","2026-10-10","2026-10-25","2026-10-26","2026-12-25",
 ]);
 
-// 目的地 → 進倉天數（航班日往前推幾天）
-const WAREHOUSE_OFFSET = { KUL: 2, SIN: 1 };
+// 航空公司（航班號開頭兩碼）→ 進倉天數（航班日往前推幾天）
+//   D7 前 2 天；MH / JX / CI / BR 前 1 天
+const AIRLINE_OFFSET = { D7: 2, MH: 1, JX: 1, CI: 1, BR: 1 };
+// 不認得的航空時的後備：依目的地（保留舊行為，SIN 1 天、其餘 2 天）
+const DEST_OFFSET_FALLBACK = { KUL: 2, SIN: 1 };
 const DEST_BY_COUNTRY = { MY: "KUL", SG: "SIN" };
 const COUNTRY_NAME = { MY: "馬來西亞", SG: "新加坡" };
 let currentCountry = null; // 每次手動選，不設預設
@@ -152,8 +155,14 @@ const pad = n => String(n).padStart(2,"0");
 function iso(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function isOff(d){ return d.getDay()===0 || d.getDay()===6 || HOLIDAYS.has(iso(d)); }
 
-function warehouseDate(flightDate, dest){
-  const off = WAREHOUSE_OFFSET[dest] != null ? WAREHOUSE_OFFSET[dest] : 2;
+// 進倉天數：優先看航空公司（航班號開頭兩碼），不認得才退回目的地後備
+function warehouseOffset(flight, dest){
+  const a = (flight || "").slice(0,2).toUpperCase();
+  if(AIRLINE_OFFSET[a] != null) return AIRLINE_OFFSET[a];
+  return DEST_OFFSET_FALLBACK[dest] != null ? DEST_OFFSET_FALLBACK[dest] : 2;
+}
+function warehouseDate(flightDate, dest, flight){
+  const off = warehouseOffset(flight, dest);
   const d = new Date(flightDate);
   d.setDate(d.getDate() - off);
   while(isOff(d)) d.setDate(d.getDate() - 1); // 遇假日往前找最近工作日
@@ -229,7 +238,7 @@ function parseRaw(text, baseYear, baseMonth){
     const fd = new Date(y, mo-1, it.day);
     it.flightDate = iso(fd);
     it.flightDateObj = fd;
-    it.warehouse = iso(warehouseDate(fd, it.dest));
+    it.warehouse = iso(warehouseDate(fd, it.dest, it.flight));
   }
   return items;
 }
@@ -293,15 +302,15 @@ function recalcWarehouse(it){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(it.flightDate||"")){ it.warehouse=""; return; }
   const fd = new Date(it.flightDate + "T00:00:00");
   if(isNaN(fd)){ it.warehouse=""; return; }
-  it.warehouse = iso(warehouseDate(fd, it.dest));
+  it.warehouse = iso(warehouseDate(fd, it.dest, it.flight));
 }
 
 window.editPending = function(i, field, value){
   const it = pending[i];
   if(!it) return;
   it[field] = value.trim();
-  if(field === "flightDate" || field === "dest"){
-    it.warehouseManual = false;   // 改航班日/目的地 → 重新自動算
+  if(field === "flightDate" || field === "dest" || field === "flight"){
+    it.warehouseManual = false;   // 改航班日/目的地/航班 → 重新自動算（航班影響進倉天數）
     recalcWarehouse(it);
     renderPreview();              // 重繪以更新進倉日顯示
   } else if(field === "warehouse"){
