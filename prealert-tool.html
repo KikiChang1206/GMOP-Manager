@@ -174,10 +174,13 @@ const API_URL = "https://script.google.com/macros/s/AKfycbzb3r_quQmfykKmizbwaI-q
 const FLIGHTS = {
   "843": {flight:"D7-379", etd:"00:20", eta:"05:10", arrOffset:2, dest:"KUL"},
   "189": {flight:"JX-725", etd:"11:00", eta:"15:50", arrOffset:1, dest:"KUL"},
+  "232": {flight:"MH-367", etd:"15:10", eta:"20:05", arrOffset:1, dest:"KUL"},
   "297": {flight:"CI-721", etd:"08:30", eta:"13:15", arrOffset:1, dest:"KUL"},
   "695": {flight:"BR-227", etd:"09:30", eta:"14:15", arrOffset:1, dest:"KUL"},
 };
 const COUNTRY_DEST = { MY:"KUL", SG:"SIN" };
+// 沒有對應航班表時的「到達日」位移（D+n）：新加坡 D+1；KUL 預設 D+1（唯一 D+2 的 D7 已在表內）
+const DEST_ARROFFSET = { KUL:1, SIN:1 };
 const COUNTRY_NAME = { MY:"馬來西亞", SG:"新加坡" };
 
 let currentCountry = null;
@@ -328,12 +331,15 @@ function updateFlightTag(){
   if(!lookupMawb){ $("flightTag").innerHTML=""; return; }
   const f = getFlightByMawb(lookupMawb.mawb);
   const dest = f ? f.dest : (COUNTRY_DEST[currentCountry]||"KUL");
+  const arrOffset = f ? f.arrOffset : (DEST_ARROFFSET[dest] ?? 1);
+  const d = new Date(lookupMawb.flightDate+"T00:00:00");
+  const a = new Date(d); a.setDate(a.getDate()+arrOffset);
   if(!f){
-    $("flightTag").innerHTML = `<div class="hint danger">MAWB 開頭無對應航班表，航班資訊需手動確認。</div>`;
+    // 沒有對應航班表（如新加坡）→ 不帶航班時間，只顯示到達日 D+n
+    $("flightTag").innerHTML = `<span class="flight-tag">✈ TPE→${dest}</span>
+      <div class="hint" style="margin-top:6px">${fmtDate(d)} → 到達 <b>${fmtDate(a)}</b>（D+${arrOffset}；此航線不帶航班時間）</div>`;
     return;
   }
-  const d = new Date(lookupMawb.flightDate+"T00:00:00");
-  const a = new Date(d); a.setDate(a.getDate()+f.arrOffset);
   $("flightTag").innerHTML = `<span class="flight-tag">✈ ${f.flight} · TPE→${dest} · ETD ${f.etd} / ETA ${f.eta}</span>
     <div class="hint" style="margin-top:6px">ETD ${f.etd}，${fmtDate(d)} → ETA ${f.eta}，<b>${fmtDate(a)}</b>（${f.arrOffset===2?"D+2":"D+1"} 到達）</div>`;
 }
@@ -563,9 +569,10 @@ function generate(){
   const f = lookupMawb ? getFlightByMawb(mawb) : null;
   const dest = f ? f.dest : (COUNTRY_DEST[currentCountry]||"KUL");
   const d = lookupMawb ? new Date(lookupMawb.flightDate+"T00:00:00") : null;
+  const arrOffset = f ? f.arrOffset : (DEST_ARROFFSET[dest] ?? 1);
   const etdDate = d ? fmtDate(d) : "____";
   let etaDate = "____";
-  if(d && f){ const a=new Date(d); a.setDate(a.getDate()+f.arrOffset); etaDate=fmtDate(a); }
+  if(d){ const a=new Date(d); a.setDate(a.getDate()+arrOffset); etaDate=fmtDate(a); }
 
   const subj = `${d?fmtSubjDate(d):"_/_"} GOOD MAJI ${dest} Pre-Alert MAWB：${mawb}`;
   $("subject").value = subj;
@@ -577,14 +584,18 @@ function generate(){
     }
   }
 
+  // 有航班表就帶時間；沒有（如新加坡）只帶日期、不帶航班時間
+  const etLines = f
+    ? `ETD ： ${f.etd} ， ${etdDate}\nETA ： ${f.eta} ， ${etaDate}`
+    : `ETD ： ${etdDate}\nETA ： ${etaDate}`;
+
   const body =
 `Hi ${currentCountry==="SG"?"SG":"MY"} Team,
 
 MAWB ： ${mawb}
 Flight No ： ${f?f.flight:"____"}
 Origin ： TPE ， DEST ： ${dest}
-ETD ： ${f?f.etd:"__:__"} ， ${etdDate}
-ETA ： ${f?f.eta:"__:__"} ， ${etaDate}
+${etLines}
 Total ： ${parsed?parsed.totalBags:"_"} Bags , ${parsed?parsed.totalWt:"_"} kgs , ${parsed?parsed.totalCN:"_"} C/N
 ${courierLines}`;
   $("body").value = body;
