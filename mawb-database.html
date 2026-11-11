@@ -73,7 +73,22 @@
   .danger{color:var(--accent)}
   .storage-banner{background:#e6eef7; border:1px solid #b9d0ea; color:#1a4f86; padding:10px 14px; border-radius:8px; font-size:13px; margin-bottom:18px}
 
+  /* ===== 頁籤 ===== */
+  .tabbar{display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--line)}
+  .tab-btn{border:none; background:none; font-family:inherit; font-size:14px; font-weight:700; color:var(--ink-soft); padding:9px 16px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px}
+  .tab-btn.active{color:var(--accent); border-bottom-color:var(--accent)}
+
   /* ===== 月曆 ===== */
+  .cal-cell{cursor:pointer}
+  .cal-cell.sel{outline:2px solid var(--accent); outline-offset:-2px}
+  .cal-detail{margin-top:12px}
+  .day-detail{background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:12px}
+  .dd-head{font-weight:800; margin-bottom:6px; display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+  .dd-sec{font-size:13px; margin-top:10px}
+  .dd-label{font-weight:700; color:var(--ink-soft); font-size:12px; margin-bottom:4px}
+  .dd-row{padding:6px 9px; background:#fff; border:1px solid var(--line); border-radius:6px; margin-top:4px; display:flex; flex-wrap:wrap; gap:3px 12px; font-size:13px}
+  .dd-row .mawb{font-weight:700}
+  .dd-empty{color:var(--ink-soft); font-size:13px; padding:2px 0}
   .cal-top{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px}
   .cal-nav{display:flex; align-items:center; gap:8px}
   .cal-label{font-weight:800; font-size:16px; min-width:110px; text-align:center}
@@ -169,41 +184,48 @@
   </div>
 </div>
 
-<!-- 3. 資料庫 -->
-<div class="card">
-  <h2><span class="n">3</span> 上傳明細</h2>
-  <div class="toolbar">
-    <button class="btn btn-ghost btn-sm" id="exportBtn">📥 匯出 Excel</button>
-    <button class="btn btn-ghost btn-sm danger" id="clearBtn">清空</button>
+<!-- 3. 明細 / 月曆（頁籤切換，縮短頁面）-->
+<div class="card" id="dataCard">
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="list">📋 上傳明細</button>
+    <button class="tab-btn" data-tab="cal">📅 月曆</button>
   </div>
-  <div id="dbWrap"></div>
-</div>
 
-<!-- 4. 月曆 -->
-<div class="card" id="calCard">
-  <h2><span class="n">4</span> 月曆（航班 · 進倉 · 假期）</h2>
-  <div class="cal-top">
-    <div class="cal-nav">
-      <button class="btn btn-ghost btn-sm" id="calPrev">‹</button>
-      <span class="cal-label" id="calLabel"></span>
-      <button class="btn btn-ghost btn-sm" id="calNext">›</button>
-      <button class="btn btn-ghost btn-sm" id="calToday">今天</button>
+  <!-- 明細 -->
+  <div class="tab-panel" id="tabList">
+    <div class="toolbar">
+      <button class="btn btn-ghost btn-sm" id="exportBtn">📥 匯出 Excel</button>
+      <button class="btn btn-ghost btn-sm danger" id="clearBtn">清空</button>
     </div>
-    <div class="cal-toggles">
-      <label><input type="checkbox" class="calHolChk" value="TW" checked> 台灣假</label>
-      <label><input type="checkbox" class="calHolChk" value="MY" checked> 馬來假</label>
-      <label><input type="checkbox" class="calHolChk" value="SG"> 新加坡假</label>
+    <div id="dbWrap"></div>
+  </div>
+
+  <!-- 月曆 -->
+  <div class="tab-panel" id="tabCal" style="display:none">
+    <div class="cal-top">
+      <div class="cal-nav">
+        <button class="btn btn-ghost btn-sm" id="calPrev">‹</button>
+        <span class="cal-label" id="calLabel"></span>
+        <button class="btn btn-ghost btn-sm" id="calNext">›</button>
+        <button class="btn btn-ghost btn-sm" id="calToday">今天</button>
+      </div>
+      <div class="cal-toggles">
+        <label><input type="checkbox" class="calHolChk" value="TW" checked> 台灣假</label>
+        <label><input type="checkbox" class="calHolChk" value="MY" checked> 馬來假</label>
+        <label><input type="checkbox" class="calHolChk" value="SG"> 新加坡假</label>
+      </div>
     </div>
+    <div class="cal-legend">
+      <span><i class="lg lg-flight"></i>✈ 航班日</span>
+      <span><i class="lg lg-wh"></i>📦 進倉日</span>
+      <span><i class="lg lg-tw"></i>台灣假</span>
+      <span><i class="lg lg-my"></i>馬來假</span>
+      <span><i class="lg lg-sg"></i>新加坡假</span>
+    </div>
+    <div id="calGrid" class="cal-grid"></div>
+    <div id="calDetail" class="cal-detail"></div>
+    <div class="hol-editor" id="holEditor"></div>
   </div>
-  <div class="cal-legend">
-    <span><i class="lg lg-flight"></i>✈ 航班日</span>
-    <span><i class="lg lg-wh"></i>📦 進倉日</span>
-    <span><i class="lg lg-tw"></i>台灣假</span>
-    <span><i class="lg lg-my"></i>馬來假</span>
-    <span><i class="lg lg-sg"></i>新加坡假</span>
-  </div>
-  <div id="calGrid" class="cal-grid"></div>
-  <div class="hol-editor" id="holEditor"></div>
 </div>
 
 </div><!-- /mainContent -->
@@ -578,12 +600,44 @@ function renderCalendar(){
       const nm = holMaps[c][ds];
       if(nm) holTags += `<span class="cal-hol ${c}" title="${c}：${esc(nm)}">${esc(nm)}</span>`;
     }
-    cells += `<div class="cal-cell ${off?'off':''} ${ds===todayISO?'today':''}">
+    cells += `<div class="cal-cell ${off?'off':''} ${ds===todayISO?'today':''}" data-ds="${ds}" onclick="showDay('${ds}')">
       <span class="d">${day}</span>${fltChip}${whChip}${holTags}</div>`;
   }
   $("calGrid").innerHTML = cells;
+  if($("calDetail")) $("calDetail").innerHTML = '<div class="dd-empty" style="padding:8px 2px">👆 點月曆上任一天，看那天哪張 MAWB 起飛、哪張要進倉。</div>';
   renderHolEditor();
 }
+
+// 點某天 → 列出當天「起飛的航班」與「要進倉的貨」，各自帶 MAWB／航班號／對應日期
+window.showDay = function(ds){
+  const db = loadDB();
+  const flts = db.filter(r=>r.flightDate===ds);
+  const whs  = db.filter(r=>r.warehouse===ds);
+  document.querySelectorAll(".cal-cell.sel").forEach(e=>e.classList.remove("sel"));
+  const cell = document.querySelector(`.cal-cell[data-ds="${ds}"]`); if(cell) cell.classList.add("sel");
+  const d = new Date(ds+"T00:00:00");
+  const hols = [];
+  for(const c of calEnabledCountries()){ const nm = holidaysOf(c)[ds]; if(nm) hols.push(`<span class="cal-hol ${c}" style="display:inline-block;margin:0">${esc(nm)}</span>`); }
+  const fltRows = flts.length
+    ? flts.map(r=>`<div class="dd-row"><span class="mawb">${r.mawb}</span><span>✈ ${esc(r.flight)}</span><span>目的 ${r.dest}</span><span>→ 進倉 ${r.warehouse||'—'}</span></div>`).join("")
+    : `<div class="dd-empty">這天沒有航班起飛</div>`;
+  const whRows = whs.length
+    ? whs.map(r=>`<div class="dd-row"><span class="mawb">${r.mawb}</span><span>✈ ${esc(r.flight)}</span><span>目的 ${r.dest}</span><span>航班日 ${r.flightDate||'—'}</span></div>`).join("")
+    : `<div class="dd-empty">這天沒有要進倉的貨</div>`;
+  $("calDetail").innerHTML = `<div class="day-detail">
+    <div class="dd-head">${ds}（${WEEK[d.getDay()]}）${hols.join(" ")}</div>
+    <div class="dd-sec"><div class="dd-label">✈ 這天起飛的航班（${flts.length}）</div>${fltRows}</div>
+    <div class="dd-sec"><div class="dd-label">📦 這天要進倉的貨（${whs.length}）</div>${whRows}</div>
+  </div>`;
+};
+
+function switchTab(tab){
+  document.querySelectorAll(".tab-btn").forEach(b=> b.classList.toggle("active", b.dataset.tab===tab));
+  $("tabList").style.display = tab==="list" ? "" : "none";
+  $("tabCal").style.display  = tab==="cal"  ? "" : "none";
+  if(tab==="cal") renderCalendar();
+}
+document.querySelectorAll(".tab-btn").forEach(b=> b.addEventListener("click", ()=>switchTab(b.dataset.tab)));
 
 function renderHolEditor(){
   if(!$("holEditor")) return;
