@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAWB 班表資料庫</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#1a2332; --ink-soft:#4a5568; --line:#dfe3ea;
+    --paper:#f7f6f2; --card:#ffffff; --accent:#c8492e; --accent-soft:#fbeae6;
+    --ok:#1f7a4d; --ok-soft:#e7f3ec; --blue:#2563a8; --warn:#b8860b;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{font-family:"Inter","Noto Sans TC",-apple-system,sans-serif; background:var(--paper); color:var(--ink); line-height:1.55; padding:24px 16px; max-width:1100px; margin:0 auto}
+  .head{border-bottom:2px solid var(--ink); padding-bottom:14px; margin-bottom:22px}
+  .head .eyebrow{font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:700}
+  .head h1{font-size:26px; font-weight:800; letter-spacing:-.01em; margin-top:4px}
+  .cloud-tag{font-size:13px; font-weight:700; color:var(--blue); background:#e6eef7; padding:3px 10px; border-radius:20px; vertical-align:middle; margin-left:8px}
+  .country-bar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:20px; padding:16px; background:var(--card); border:1px solid var(--line); border-radius:12px}
+  .country-label{font-size:13px; font-weight:700; color:var(--ink-soft)}
+  .country-btn{padding:12px 18px; border:2px solid var(--line); background:#fff; border-radius:10px; font-family:inherit; font-size:15px; font-weight:700; color:var(--ink); cursor:pointer; transition:.12s}
+  .country-btn:hover{border-color:var(--accent)}
+  .country-btn.active{border-color:var(--accent); background:var(--accent-soft); color:var(--accent)}
+  .tip{position:relative; display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; font-size:11px; cursor:help; color:var(--accent); outline:none; margin-left:2px}
+  .tip .tip-bubble{visibility:hidden; opacity:0; transition:opacity .15s; position:absolute; left:50%; bottom:140%; transform:translateX(-50%); width:240px; background:var(--ink); color:#fff; font-size:12px; font-weight:400; line-height:1.5; padding:8px 10px; border-radius:8px; z-index:10; box-shadow:0 4px 14px rgba(0,0,0,.18)}
+  .tip .tip-bubble::after{content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:6px solid transparent; border-top-color:var(--ink)}
+  .tip:hover .tip-bubble, .tip:focus .tip-bubble{visibility:visible; opacity:1}
+  .head p{color:var(--ink-soft); font-size:14px; margin-top:4px}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:20px}
+  .card h2{font-size:13px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:14px; display:flex; align-items:center; gap:8px}
+  .card h2 .n{background:var(--ink); color:#fff; width:22px; height:22px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700}
+
+  label{display:block; font-size:13px; font-weight:600; margin:12px 0 5px}
+  textarea,input,select{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:15px; font-family:inherit; background:#fff; color:var(--ink)}
+  textarea{min-height:150px; font-family:ui-monospace,monospace; font-size:13px; line-height:1.6; resize:vertical}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent); outline-offset:-1px; border-color:transparent}
+
+  .row{display:flex; gap:10px; flex-wrap:wrap}
+  .row > *{flex:1; min-width:140px}
+
+  .btn{border:none; border-radius:8px; padding:11px 18px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; transition:.12s}
+  .btn-primary{background:var(--accent); color:#fff}
+  .btn-primary:hover{background:#a83a22}
+  .btn-ghost{background:#fff; border:1px solid var(--line); color:var(--ink)}
+  .btn-ghost:hover{border-color:var(--ink)}
+  .btn-ok{background:var(--ok); color:#fff}
+  .btn-ok:hover{background:#19663f}
+  .btn-sm{padding:6px 12px; font-size:13px}
+
+  table{width:100%; border-collapse:collapse; font-size:13px; margin-top:8px}
+  th,td{text-align:left; padding:9px 10px; border-bottom:1px solid var(--line)}
+  th{font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); background:var(--paper)}
+  tr:hover td{background:#fafafa}
+  td.warehouse{font-weight:700; color:var(--accent)}
+  .edit-table input{padding:6px 8px; font-size:13px; border:1px solid var(--line); border-radius:6px; width:100%; min-width:90px}
+  .edit-table .cell-wh{color:var(--accent); font-weight:700}
+  .edit-table .cell-dest{text-transform:uppercase}
+  .tag-manual{display:inline-block; margin-left:4px; font-size:10px; background:var(--accent-soft); color:var(--accent); padding:1px 5px; border-radius:4px; font-weight:700}
+  .badge{display:inline-block; padding:2px 8px; border-radius:5px; font-size:11px; font-weight:700; background:var(--accent-soft); color:var(--accent)}
+  .badge.sin{background:#e6eef7; color:var(--blue)}
+
+  .preview-row.dup{background:#fff4e5}
+  .preview-row.dupdate td{background:#ffe3e3}
+  .preview-row.dupdate td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+  .badge-dup{display:inline-block; margin-left:4px; padding:2px 7px; border-radius:5px; font-size:11px; font-weight:700; background:#fde2e2; color:var(--accent); white-space:nowrap}
+  .empty{color:var(--ink-soft); font-size:14px; padding:20px; text-align:center}
+  .pill{display:inline-flex; align-items:center; gap:6px; background:var(--ok-soft); color:var(--ok); padding:4px 10px; border-radius:20px; font-size:12px; font-weight:700}
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px}
+  .toolbar .grow{flex:1}
+  .note{font-size:12px; color:var(--ink-soft); margin-top:6px}
+  .danger{color:var(--accent)}
+  .storage-banner{background:#e6eef7; border:1px solid #b9d0ea; color:#1a4f86; padding:10px 14px; border-radius:8px; font-size:13px; margin-bottom:18px}
+
+  /* ===== 頁籤 ===== */
+  .tabbar{display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--line)}
+  .tab-btn{border:none; background:none; font-family:inherit; font-size:14px; font-weight:700; color:var(--ink-soft); padding:9px 16px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px}
+  .tab-btn.active{color:var(--accent); border-bottom-color:var(--accent)}
+
+  /* ===== 月曆 ===== */
+  .cal-cell{cursor:pointer}
+  .cal-cell.sel{outline:2px solid var(--accent); outline-offset:-2px}
+  .cal-detail{margin-top:12px}
+  .day-detail{background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:12px}
+  .dd-head{font-weight:800; margin-bottom:6px; display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+  .dd-sec{font-size:13px; margin-top:10px}
+  .dd-label{font-weight:700; color:var(--ink-soft); font-size:12px; margin-bottom:4px}
+  .dd-row{padding:6px 9px; background:#fff; border:1px solid var(--line); border-radius:6px; margin-top:4px; display:flex; flex-wrap:wrap; gap:3px 12px; font-size:13px}
+  .dd-row .mawb{font-weight:700}
+  .dd-empty{color:var(--ink-soft); font-size:13px; padding:2px 0}
+  .cal-top{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px}
+  .cal-nav{display:flex; align-items:center; gap:8px}
+  .cal-label{font-weight:800; font-size:16px; min-width:110px; text-align:center}
+  .cal-toggles{display:flex; gap:12px; font-size:13px; flex-wrap:wrap}
+  .cal-toggles label{display:flex; align-items:center; gap:5px; cursor:pointer}
+  .cal-legend{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--ink-soft); margin-bottom:10px}
+  .cal-legend .lg{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:4px; vertical-align:middle}
+  .lg-flight{background:var(--blue)} .lg-wh{background:var(--ok)} .lg-tw{background:var(--accent)} .lg-my{background:var(--ok)} .lg-sg{background:var(--blue)}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px}
+  .cal-dow{text-align:center; font-size:11px; font-weight:700; color:var(--ink-soft); padding:4px 0}
+  .cal-cell{min-height:66px; border:1px solid var(--line); border-radius:7px; padding:4px 5px; background:#fff; overflow:hidden}
+  .cal-cell.out{background:#f4f4f2; border-color:#eee}
+  .cal-cell.off{background:#faece9}
+  .cal-cell .d{font-weight:700; font-size:12px}
+  .cal-cell.today .d{background:var(--ink); color:#fff; border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center}
+  .cal-chip{display:block; margin-top:2px; font-size:11px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .cal-chip.flt{color:var(--blue); font-weight:700}
+  .cal-chip.wh{color:var(--ok); font-weight:700}
+  .cal-hol{display:block; font-size:10px; padding:0 4px; border-radius:4px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .cal-hol.TW{background:var(--accent-soft); color:var(--accent)} .cal-hol.MY{background:var(--ok-soft); color:var(--ok)} .cal-hol.SG{background:#e6eef7; color:var(--blue)}
+  .hol-editor{margin-top:14px; border-top:1px solid var(--line); padding-top:12px}
+  .hol-head{font-size:13px; font-weight:700; color:var(--ink-soft); margin-bottom:8px}
+  .hol-list{display:flex; flex-direction:column; gap:4px; margin-bottom:10px}
+  .hol-item{display:flex; align-items:center; gap:6px; font-size:13px}
+  .hol-item .cal-hol{display:inline-block; margin:0}
+  .hol-x{margin-left:auto; border:none; background:#f0f0f0; color:var(--ink-soft); border-radius:5px; width:24px; height:24px; cursor:pointer; font-size:14px; font-weight:700}
+  .hol-x:hover{background:var(--accent-soft); color:var(--accent)}
+  .hol-add{display:flex; gap:6px; flex-wrap:wrap}
+  .hol-add select, .hol-add input{flex:0 1 auto; padding:8px 10px; border:1px solid var(--line); border-radius:6px; font-size:13px}
+  .hol-add input[type=text]{flex:1; min-width:120px}
+
+  /* 表格在窄螢幕可左右滑，不壓縮欄位 */
+  #dbWrap, #previewWrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  /* ===== 手機版 ===== */
+  @media (max-width:640px){
+    body{ padding:16px 12px; }
+    .head h1{ font-size:22px; }
+    .card{ padding:14px; }
+    .country-btn{ flex:1; }
+    table{ font-size:12px; }
+    th,td{ padding:8px 8px; white-space:nowrap; }
+    /* 16px 以上避免 iOS 聚焦時自動放大畫面 */
+    textarea,input,select{ font-size:16px; }
+    .edit-table input{ font-size:16px; min-width:84px; }
+    .btn{ padding:12px 16px; }      /* 觸控目標放大 */
+    .btn-sm{ padding:9px 12px; }
+    .cal-cell{ min-height:58px; padding:3px 3px; }
+    .cal-cell .d{ font-size:11px; }
+    .cal-chip, .cal-hol{ font-size:9px; }
+    .cal-grid{ gap:3px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div class="eyebrow">GOOD MAJI · Logistics</div>
+  <h1>MAWB 班表資料庫 <span class="cloud-tag">☁️ 雲端版</span></h1>
+</div>
+
+<!-- 國別選擇 -->
+<div class="country-bar" id="countryBar">
+  <span class="country-label">選擇國別：</span>
+  <button class="country-btn" data-country="MY" onclick="selectCountry('MY')">🇲🇾 馬來西亞</button>
+  <button class="country-btn" data-country="SG" onclick="selectCountry('SG')">🇸🇬 新加坡</button>
+</div>
+
+<!-- 主內容（選國別後才顯示） -->
+<div id="mainContent" style="display:none">
+
+<!-- 1. 貼上 -->
+<div class="card">
+  <h2><span class="n">1</span> 貼上航空公司班表</h2>
+  <textarea id="rawInput" placeholder="直接貼上文字"></textarea>
+  <div class="row" style="margin-top:12px">
+    <div style="flex:0 0 auto">
+      <label>航班日所屬月份 <span class="tip" tabindex="0">❗<span class="tip-bubble">只有在班表「沒帶月份」(如 /01)時才用這個。若班表已含月份(如 01OCT)會自動判月份、自動帶目的地，這裡選什麼都會被忽略。跨月(30 號後接 01 號)系統自動把較小日號歸下月。</span></span></label>
+      <select id="baseMonth"></select>
+    </div>
+    <div style="flex:0 0 auto; display:flex; align-items:flex-end">
+      <button class="btn btn-primary" id="parseBtn">🔍 拆解並預覽</button>
+    </div>
+  </div>
+</div>
+
+<!-- 2. 預覽 -->
+<div class="card" id="previewCard" style="display:none">
+  <h2><span class="n">2</span> 確認後存入</h2>
+  <div id="previewWrap"></div>
+  <div class="toolbar" style="margin-top:14px">
+    <button class="btn btn-ok" id="saveBtn">✓ 全部存入資料庫</button>
+    <span class="note" id="previewNote"></span>
+  </div>
+</div>
+
+<!-- 3. 明細 / 月曆（頁籤切換，縮短頁面）-->
+<div class="card" id="dataCard">
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="list">📋 上傳明細</button>
+    <button class="tab-btn" data-tab="cal">📅 月曆</button>
+  </div>
+
+  <!-- 明細 -->
+  <div class="tab-panel" id="tabList">
+    <div class="toolbar">
+      <button class="btn btn-ghost btn-sm" id="exportBtn">📥 匯出 Excel</button>
+      <button class="btn btn-ghost btn-sm danger" id="clearBtn">清空</button>
+    </div>
+    <div id="dbWrap"></div>
+  </div>
+
+  <!-- 月曆 -->
+  <div class="tab-panel" id="tabCal" style="display:none">
+    <div class="cal-top">
+      <div class="cal-nav">
+        <button class="btn btn-ghost btn-sm" id="calPrev">‹</button>
+        <span class="cal-label" id="calLabel"></span>
+        <button class="btn btn-ghost btn-sm" id="calNext">›</button>
+        <button class="btn btn-ghost btn-sm" id="calToday">今天</button>
+      </div>
+      <div class="cal-toggles">
+        <label><input type="checkbox" class="calHolChk" value="TW" checked> 台灣假</label>
+        <label><input type="checkbox" class="calHolChk" value="MY" checked> 馬來假</label>
+        <label><input type="checkbox" class="calHolChk" value="SG"> 新加坡假</label>
+      </div>
+    </div>
+    <div class="cal-legend">
+      <span><i class="lg lg-flight"></i>✈ 航班日</span>
+      <span><i class="lg lg-wh"></i>📦 進倉日</span>
+      <span><i class="lg lg-tw"></i>台灣假</span>
+      <span><i class="lg lg-my"></i>馬來假</span>
+      <span><i class="lg lg-sg"></i>新加坡假</span>
+    </div>
+    <div id="calGrid" class="cal-grid"></div>
+    <div id="calDetail" class="cal-detail"></div>
+    <div class="hol-editor" id="holEditor"></div>
+  </div>
+</div>
+
+</div><!-- /mainContent -->
+
+<footer style="text-align:center; color:var(--ink-soft); font-size:12px; margin-top:10px; padding-top:16px; border-top:1px solid var(--line)">
+  進倉日已套用 2026 + 2027 台灣國定假日 · 雲端共用（Google Sheet）· GOOD MAJI 內部工具
+</footer>
+
+<script>
+// ===== 國定假日（預設值，可在日曆下方自行增刪）=====
+// 台灣(TW) 用於「進倉日」計算會全部避開；新加坡(SG)、馬來(MY) 僅在日曆顯示。
+// 標「估」者為農曆/回曆假期，日期以月相為準、可能微調，請自行確認。
+const HOLIDAYS_DEFAULT = {
+  TW: {
+    "2026-01-01":"元旦",
+    "2026-02-14":"春節","2026-02-15":"除夕","2026-02-16":"初一","2026-02-17":"初二","2026-02-18":"初三","2026-02-19":"春節","2026-02-20":"春節","2026-02-21":"春節","2026-02-22":"春節",
+    "2026-02-27":"和平紀念(彈性)","2026-02-28":"和平紀念日",
+    "2026-04-03":"兒童節(彈性)","2026-04-04":"兒童節","2026-04-05":"清明節","2026-04-06":"清明補假",
+    "2026-05-01":"勞動節","2026-06-19":"端午節","2026-09-25":"中秋節","2026-09-28":"教師節",
+    "2026-10-09":"國慶(彈性)","2026-10-10":"國慶日","2026-10-25":"光復節","2026-10-26":"光復補假","2026-12-25":"行憲紀念日",
+    "2027-01-01":"元旦",
+    "2027-02-04":"春節","2027-02-05":"除夕","2027-02-06":"初一","2027-02-07":"初二","2027-02-08":"初三","2027-02-09":"春節補假","2027-02-10":"春節補假",
+    "2027-02-27":"和平紀念日","2027-02-28":"和平紀念日","2027-03-01":"和平補假",
+    "2027-04-03":"兒童節","2027-04-04":"兒童節","2027-04-05":"清明節","2027-04-06":"清明補假",
+    "2027-04-30":"勞動補假","2027-05-01":"勞動節","2027-05-02":"勞動節",
+    "2027-06-09":"端午節","2027-09-15":"中秋節","2027-09-28":"教師節",
+    "2027-10-09":"國慶日","2027-10-10":"國慶日","2027-10-11":"國慶補假",
+    "2027-10-23":"光復節","2027-10-24":"光復節","2027-10-25":"光復節",
+    "2027-12-24":"行憲補假","2027-12-25":"行憲紀念日","2027-12-26":"行憲紀念日","2027-12-31":"元旦補假",
+  },
+  SG: {
+    "2026-01-01":"New Year","2026-02-17":"CNY","2026-02-18":"CNY",
+    "2026-03-21":"Hari Raya Puasa(估)","2026-04-03":"Good Friday","2026-05-01":"Labour Day",
+    "2026-05-27":"Hari Raya Haji(估)","2026-05-31":"Vesak Day","2026-06-01":"Vesak補假",
+    "2026-08-09":"National Day","2026-08-10":"National補假","2026-11-08":"Deepavali","2026-11-09":"Deepavali補假","2026-12-25":"Christmas",
+    "2027-01-01":"New Year","2027-02-06":"CNY","2027-02-07":"CNY","2027-02-08":"CNY補假",
+    "2027-03-10":"Hari Raya Puasa(估)","2027-03-26":"Good Friday","2027-05-01":"Labour Day",
+    "2027-05-17":"Hari Raya Haji(估)","2027-05-20":"Vesak Day","2027-08-09":"National Day",
+    "2027-10-28":"Deepavali","2027-12-25":"Christmas",
+  },
+  MY: {
+    "2026-01-01":"元旦","2026-02-01":"聯邦直轄區日","2026-02-02":"補假",
+    "2026-02-17":"農曆新年","2026-02-18":"農曆新年","2026-03-20":"開齋節(估)","2026-03-21":"開齋節(估)",
+    "2026-05-01":"勞動節","2026-05-31":"衛塞節","2026-06-01":"國王誕辰","2026-06-17":"回曆新年(估)",
+    "2026-08-31":"國慶日","2026-09-16":"馬來西亞日","2026-11-08":"屠妖節(估)","2026-12-25":"聖誕節",
+    "2027-02-01":"聯邦直轄區日","2027-02-06":"農曆新年","2027-02-07":"農曆新年",
+    "2027-03-10":"開齋節(估)","2027-05-01":"勞動節","2027-05-17":"哈芝節(估)","2027-05-20":"衛塞節",
+    "2027-06-07":"國王誕辰(估)","2027-08-31":"國慶日","2027-09-16":"馬來西亞日","2027-10-28":"屠妖節(估)","2027-12-25":"聖誕節",
+  },
+};
+// 已建好假日資料的年份；進倉日落在不在此清單的年份 → 提醒使用者只避開了週末
+const HOLIDAY_YEARS = new Set([2026, 2027]);
+
+// 使用者自訂假期（存在這台裝置 localStorage）：{ add:{TW:{date:name}}, hide:{TW:[date,...]} }
+function loadUserHolidays(){ try{ return JSON.parse(localStorage.getItem("gm_holidays")||'{"add":{},"hide":{}}'); }catch(e){ return {add:{},hide:{}}; } }
+function saveUserHolidays(){ try{ localStorage.setItem("gm_holidays", JSON.stringify(USER_HOL)); }catch(e){} }
+let USER_HOL = loadUserHolidays();
+// 合併「預設 + 使用者新增 − 使用者隱藏」後某國的假期 {date:name}
+function holidaysOf(country){
+  const map = Object.assign({}, HOLIDAYS_DEFAULT[country]||{}, (USER_HOL.add&&USER_HOL.add[country])||{});
+  const hide = (USER_HOL.hide&&USER_HOL.hide[country])||[];
+  for(const d of hide) delete map[d];
+  return map;
+}
+// 台灣進倉避假用的日期集合（含使用者自訂），編輯假期後要 rebuild
+let TW_OFF = new Set();
+function rebuildTWOff(){ TW_OFF = new Set(Object.keys(holidaysOf("TW"))); }
+rebuildTWOff();
+
+// 航空公司（航班號開頭兩碼）→ 進倉天數（航班日往前推幾天）
+//   D7 前 2 天；MH / JX / CI / BR 前 1 天
+const AIRLINE_OFFSET = { D7: 2, MH: 1, JX: 1, CI: 1, BR: 1 };
+// 不認得的航空時的後備：依目的地（保留舊行為，SIN 1 天、其餘 2 天）
+const DEST_OFFSET_FALLBACK = { KUL: 2, SIN: 1 };
+const DEST_BY_COUNTRY = { MY: "KUL", SG: "SIN" };
+const COUNTRY_NAME = { MY: "馬來西亞", SG: "新加坡" };
+let currentCountry = null; // 每次手動選，不設預設
+const WEEK = "日一二三四五六";
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,"0");
+
+function iso(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function isOff(d){ return d.getDay()===0 || d.getDay()===6 || TW_OFF.has(iso(d)); }
+
+// 進倉天數：優先看航空公司（航班號開頭兩碼），不認得才退回目的地後備
+function warehouseOffset(flight, dest){
+  const a = (flight || "").slice(0,2).toUpperCase();
+  if(AIRLINE_OFFSET[a] != null) return AIRLINE_OFFSET[a];
+  return DEST_OFFSET_FALLBACK[dest] != null ? DEST_OFFSET_FALLBACK[dest] : 2;
+}
+function warehouseDate(flightDate, dest, flight){
+  const off = warehouseOffset(flight, dest);
+  const d = new Date(flightDate);
+  d.setDate(d.getDate() - off);
+  while(isOff(d)) d.setDate(d.getDate() - 1); // 遇假日往前找最近工作日
+  return d;
+}
+function fmt(d){ return `${iso(d)}（${WEEK[d.getDay()]}）`; }
+
+// ===== 「訂位資料」衍生欄位（都從航班日 + 航班號算，不需另存後端）=====
+function flightDateObj(r){
+  if(!r || !/^\d{4}-\d{2}-\d{2}$/.test(r.flightDate||"")) return null;
+  const d = new Date(r.flightDate + "T00:00:00");
+  return isNaN(d) ? null : d;
+}
+function fltDateStr(r){ const d=flightDateObj(r); return r.flight ? `${r.flight}/${d?pad(d.getDate()):""}` : ""; } // MH367/04
+function monthAbbr(r){ const d=flightDateObj(r); return d ? MONTHS_ABBR[d.getMonth()] : ""; }                    // DEC
+function weekdayTW(r){ const d=flightDateObj(r); return d ? `(${WEEK[d.getDay()]})` : ""; }                       // (二)
+
+// ===== 解析 =====
+// 月份縮寫 → 月 index(0-11)，用來吃 "01OCT" 這種航空標準日期格式
+const MONTH_ABBR = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
+// MAWB 開頭 → 目的地（班表沒附目的地代碼時用來自動帶）
+const PREFIX_DEST = { "843":"KUL", "189":"KUL", "232":"KUL", "297":"KUL", "695":"KUL" };
+// 月份縮寫（0-11 對應），匯出 MONTH 欄用
+const MONTHS_ABBR = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+// 容忍這些格式（第 4 段彈性、航班號可帶橫線）：
+//   843-46243455 D7379/01OCT    日+月黏在一起、無目的地 ← 實際航空公司給的格式
+//   232-18403571 MH367/04       日（無月份無目的地）
+//   189-05260474 JX-725/03      航班號帶橫線
+//   843-46137836 D7379/01 KUL   日 + 目的地代碼
+const LINE_RE = /(\d{3}-\d{8})\s+([A-Z0-9][A-Z0-9-]*)\/(\d{1,2})\s*([A-Z]{3})?/;
+
+// 有明確月份（OCT）時推年份：預設今年，若該日期已過超過半年視為明年（處理 12 月貼 1 月班表）
+function yearForMonth(monthIdx, day){
+  const now = new Date();
+  let y = now.getFullYear();
+  const d = new Date(y, monthIdx, day);
+  if(now - d > 183*24*3600*1000) y += 1;
+  return y;
+}
+
+function parseRaw(text, baseYear, baseMonth){
+  const lines = text.split(/\r?\n/);
+  const items = [];
+  for(const line of lines){
+    const m = line.match(LINE_RE);
+    if(!m) continue;
+    const [, mawb, flight, dayStr, token] = m;
+    // 第 4 段可能是「月份縮寫(OCT)」或「目的地(KUL)」或沒有
+    let explicitMonth = null, dest = null;
+    if(token){
+      if(token in MONTH_ABBR) explicitMonth = MONTH_ABBR[token];
+      else dest = token;
+    }
+    // 目的地優先序：班表明寫 > MAWB 開頭對照 > 國別預設
+    if(!dest) dest = PREFIX_DEST[mawb.slice(0,3)] || DEST_BY_COUNTRY[currentCountry] || "KUL";
+    items.push({ mawb, flight, day: parseInt(dayStr,10), dest, explicitMonth });
+  }
+  // 跨月判斷只用在「沒有明確月份」的舊格式；有 OCT 這種就各自直接用該月份
+  let rolledOver = false;
+  let prevDay = 0;
+  for(const it of items){
+    let y, mo; // mo 為 1-12
+    if(it.explicitMonth != null){
+      mo = it.explicitMonth + 1;
+      y  = yearForMonth(it.explicitMonth, it.day);
+    } else {
+      if(it.day < prevDay) rolledOver = true;
+      prevDay = it.day;
+      y = baseYear; mo = baseMonth;
+      if(rolledOver){ mo += 1; if(mo>12){ mo=1; y+=1; } }
+    }
+    const fd = new Date(y, mo-1, it.day);
+    it.flightDate = iso(fd);
+    it.flightDateObj = fd;
+    it.warehouse = iso(warehouseDate(fd, it.dest, it.flight));
+  }
+  return items;
+}
+
+// ===== 資料庫（Google Sheet 後端，多人共用）=====
+const API_URL = "https://script.google.com/macros/s/AKfycbzb3r_quQmfykKmizbwaI-qHXYF_gK5lm_G-0GtS_rC_myWDxrf7caK9Q_gmaDT-eYE/exec";
+let DB_CACHE = [];        // 記憶體快取，渲染都讀這個
+let dbLoaded = false;
+
+function loadDB(){ return DB_CACHE; }  // 同步讀快取（給渲染用）
+
+async function fetchDB(){
+  const res = await fetch(`${API_URL}?action=list&country=${currentCountry}`);
+  const data = await res.json();
+  if(!data.ok) throw new Error(data.error || "讀取失敗");
+  DB_CACHE = data.rows || [];
+  dbLoaded = true;
+  return DB_CACHE;
+}
+
+async function saveToSheet(items){
+  const body = new URLSearchParams();
+  body.set("action","save");
+  body.set("country", currentCountry);
+  body.set("items", JSON.stringify(items));
+  const res = await fetch(API_URL, { method:"POST", body });
+  const data = await res.json();
+  if(!data.ok) throw new Error(data.error || "存入失敗");
+  return data;
+}
+
+async function deleteFromSheet(mawb){
+  const body = new URLSearchParams();
+  body.set("action","delete");
+  body.set("country", currentCountry);
+  body.set("mawb", mawb);
+  const res = await fetch(API_URL, { method:"POST", body });
+  const data = await res.json();
+  if(!data.ok) throw new Error(data.error || "刪除失敗");
+  return data;
+}
+
+let pending = []; // 預覽中待存入
+
+function renderMonthOptions(){
+  const sel = $("baseMonth");
+  const now = new Date();
+  let opts = "";
+  for(let i=0;i<6;i++){
+    const d = new Date(now.getFullYear(), now.getMonth()+i, 1);
+    const val = `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+    const label = `${d.getFullYear()} 年 ${d.getMonth()+1} 月`;
+    opts += `<option value="${val}">${label}</option>`;
+  }
+  sel.innerHTML = opts;
+}
+
+function recalcWarehouse(it){
+  // 依航班日重算進倉日（除非使用者手動覆寫過）
+  if(it.warehouseManual) return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(it.flightDate||"")){ it.warehouse=""; return; }
+  const fd = new Date(it.flightDate + "T00:00:00");
+  if(isNaN(fd)){ it.warehouse=""; return; }
+  it.warehouse = iso(warehouseDate(fd, it.dest, it.flight));
+}
+
+window.editPending = function(i, field, value){
+  const it = pending[i];
+  if(!it) return;
+  it[field] = value.trim();
+  if(field === "flightDate" || field === "dest" || field === "flight"){
+    it.warehouseManual = false;   // 改航班日/目的地/航班 → 重新自動算（航班影響進倉天數）
+    recalcWarehouse(it);
+    renderPreview();              // 重繪以更新進倉日顯示
+  } else if(field === "warehouse"){
+    it.warehouseManual = true;    // 手動覆寫進倉日 → 鎖住不被重算
+  }
+};
+
+window.delPending = function(i){
+  pending.splice(i,1);
+  renderPreview();
+};
+
+window.addPendingRow = function(){
+  pending.push({ mawb:"", flight:"", dest:DEST_BY_COUNTRY[currentCountry]||"KUL", flightDate:"", warehouse:"", warehouseManual:false });
+  renderPreview();
+};
+
+function renderPreview(){
+  if(!pending.length){
+    $("previewCard").style.display="none"; return;
+  }
+  const existing = new Set(loadDB().map(r=>r.mawb));
+  const existingDates = new Set(loadDB().map(r=>r.flightDate).filter(Boolean));
+  const dateCount = {};
+  pending.forEach(it=>{ if(it.flightDate) dateCount[it.flightDate] = (dateCount[it.flightDate]||0)+1; });
+  let dup=0, dupDateRows=0;
+  const rows = pending.map((it,i)=>{
+    const isDup = it.mawb && existing.has(it.mawb);
+    if(isDup) dup++;
+    const sameInBatch = it.flightDate ? (dateCount[it.flightDate]||0) : 0;
+    const inDB = !!(it.flightDate && existingDates.has(it.flightDate));
+    const dupDate = !!(it.flightDate && (sameInBatch>1 || inDB));   // 航班日重複（同批多筆 或 已在資料庫）
+    if(dupDate) dupDateRows++;
+    const dateBadge = dupDate ? ` <span class="badge-dup">⚠ 航班日重複${sameInBatch>1?` ×${sameInBatch}`:''}${inDB?'·已在庫':''}</span>` : '';
+    return `<tr class="preview-row ${isDup?'dup':''} ${dupDate?'dupdate':''}">
+      <td><input value="${it.warehouse||""}" onchange="editPending(${i},'warehouse',this.value)" class="cell-wh" placeholder="YYYY-MM-DD">${it.warehouseManual?'<span class="tag-manual">手動</span>':''}</td>
+      <td><input value="${it.mawb||""}" onchange="editPending(${i},'mawb',this.value)" placeholder="000-00000000">${isDup?' <span class="badge">已存在</span>':''}</td>
+      <td><input value="${it.flight||""}" onchange="editPending(${i},'flight',this.value)" placeholder="D7379"></td>
+      <td><input value="${it.dest||""}" onchange="editPending(${i},'dest',this.value)" class="cell-dest" placeholder="KUL"></td>
+      <td><input value="${it.flightDate||""}" onchange="editPending(${i},'flightDate',this.value)" placeholder="YYYY-MM-DD">${dateBadge}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="delPending(${i})">刪</button></td>
+    </tr>`;
+  }).join("");
+  $("previewWrap").innerHTML = `<table class="edit-table">
+    <thead><tr><th>進倉日</th><th>MAWB</th><th>航班</th><th>目的</th><th>航班日</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="addPendingRow()">＋ 手動新增一筆</button>`;
+  // 檢查進倉日/航班日是否落在「還沒建假日資料」的年份
+  const uncovered = new Set();
+  pending.forEach(it=>{
+    [it.flightDate, it.warehouse].forEach(s=>{
+      const m = /^(\d{4})-/.exec(s||"");
+      if(m && !HOLIDAY_YEARS.has(+m[1])) uncovered.add(m[1]);
+    });
+  });
+  const warnYears = uncovered.size
+    ? `<br><b class="danger">⚠ ${[...uncovered].sort().join("、")} 年還沒建國定假日資料，這些進倉日只避開了週末、沒避開國定假日，請自行確認。</b>`
+    : "";
+  const dupDateNote = dupDateRows ? `<br><b class="danger">⚠ 有 ${dupDateRows} 筆航班日重複（同一天多筆，或該日已在資料庫）——同一天多張 MAWB 是正常的，但也可能是重複貼到，請確認。</b>` : '';
+  $("previewNote").innerHTML = `共 ${pending.length} 筆${dup?`，其中 <b class="danger">${dup} 筆已存在</b>（存入時會更新覆蓋）`:''}。改航班日進倉日會自動重算；手動改進倉日後會鎖住不再重算。${dupDateNote}${warnYears}`;
+  $("previewCard").style.display="block";
+}
+
+function renderDB(){
+  const db = loadDB();
+  let rows = db.slice();
+  // 依進倉日排序，其次 MAWB
+  rows.sort((a,b)=> (a.warehouse||"").localeCompare(b.warehouse||"") || a.mawb.localeCompare(b.mawb));
+
+  if(!rows.length){
+    $("dbWrap").innerHTML = `<div class="empty">還沒有資料，從上方貼一段班表開始。</div>`;
+    renderCalendar();
+    return;
+  }
+  const body = rows.map(r=>{
+    const destBadge = r.dest==="SIN" ? 'badge sin' : 'badge';
+    return `<tr>
+      <td class="warehouse">${r.warehouse||""}</td>
+      <td>${r.mawb}</td>
+      <td>${fltDateStr(r)}</td>
+      <td>${monthAbbr(r)}</td>
+      <td>${weekdayTW(r)}</td>
+      <td><span class="${destBadge}">${r.dest}</span></td>
+      <td>${r.flightDate||""}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="delRow('${r.mawb}')">刪除</button></td>
+    </tr>`;
+  }).join("");
+  $("dbWrap").innerHTML = `<div class="pill" style="margin-bottom:10px">共 ${rows.length} 筆</div>
+    <table><thead><tr><th>進倉日</th><th>MAWB</th><th>FLT/DATE</th><th>MONTH</th><th>星期</th><th>目的</th><th>航班日</th><th></th></tr></thead>
+    <tbody>${body}</tbody></table>
+    <div class="note">匯出 Excel 會多 PC/WT、W/H、備註 三欄（留白讓你自己填）。</div>`;
+  renderCalendar();
+}
+
+// ===== 月曆 =====
+let calYear, calMonth; // calMonth 0-11
+(function(){ const n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth(); })();
+
+function calEnabledCountries(){
+  return [...document.querySelectorAll(".calHolChk")].filter(c=>c.checked).map(c=>c.value);
+}
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
+
+function renderCalendar(){
+  if(!$("calGrid")) return;
+  const db = loadDB();
+  const byFlight={}, byWh={};
+  for(const r of db){
+    if(r.flightDate){ (byFlight[r.flightDate]=byFlight[r.flightDate]||[]).push(r); }
+    if(r.warehouse){ (byWh[r.warehouse]=byWh[r.warehouse]||[]).push(r); }
+  }
+  const countries = calEnabledCountries();
+  const holMaps = {}; countries.forEach(c=> holMaps[c]=holidaysOf(c));
+  $("calLabel").textContent = `${calYear} 年 ${calMonth+1} 月`;
+  const startDow = new Date(calYear, calMonth, 1).getDay();      // 0=日
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const todayISO = iso(new Date());
+  const dow = ["日","一","二","三","四","五","六"];
+  let cells = dow.map(d=>`<div class="cal-dow">${d}</div>`).join("");
+  for(let i=0;i<startDow;i++) cells += `<div class="cal-cell out"></div>`;
+  for(let day=1; day<=daysInMonth; day++){
+    const d = new Date(calYear, calMonth, day);
+    const ds = iso(d);
+    const weekend = d.getDay()===0 || d.getDay()===6;
+    const off = weekend || TW_OFF.has(ds);
+    const flts = byFlight[ds]||[];
+    const whs  = byWh[ds]||[];
+    const fltChip = flts.length ? `<span class="cal-chip flt" title="航班：${esc(flts.map(r=>r.mawb+' '+r.flight).join('、'))}">✈${flts.length}</span>` : "";
+    const whChip  = whs.length  ? `<span class="cal-chip wh" title="進倉：${esc(whs.map(r=>r.mawb+' '+r.flight).join('、'))}">📦${whs.length}</span>` : "";
+    let holTags = "";
+    for(const c of countries){
+      const nm = holMaps[c][ds];
+      if(nm) holTags += `<span class="cal-hol ${c}" title="${c}：${esc(nm)}">${esc(nm)}</span>`;
+    }
+    cells += `<div class="cal-cell ${off?'off':''} ${ds===todayISO?'today':''}" data-ds="${ds}" onclick="showDay('${ds}')">
+      <span class="d">${day}</span>${fltChip}${whChip}${holTags}</div>`;
+  }
+  $("calGrid").innerHTML = cells;
+  if($("calDetail")) $("calDetail").innerHTML = '<div class="dd-empty" style="padding:8px 2px">👆 點月曆上任一天，看那天哪張 MAWB 起飛、哪張要進倉。</div>';
+  renderHolEditor();
+}
+
+// 點某天 → 列出當天「起飛的航班」與「要進倉的貨」，各自帶 MAWB／航班號／對應日期
+window.showDay = function(ds){
+  const db = loadDB();
+  const flts = db.filter(r=>r.flightDate===ds);
+  const whs  = db.filter(r=>r.warehouse===ds);
+  document.querySelectorAll(".cal-cell.sel").forEach(e=>e.classList.remove("sel"));
+  const cell = document.querySelector(`.cal-cell[data-ds="${ds}"]`); if(cell) cell.classList.add("sel");
+  const d = new Date(ds+"T00:00:00");
+  const hols = [];
+  for(const c of calEnabledCountries()){ const nm = holidaysOf(c)[ds]; if(nm) hols.push(`<span class="cal-hol ${c}" style="display:inline-block;margin:0">${esc(nm)}</span>`); }
+  const fltRows = flts.length
+    ? flts.map(r=>`<div class="dd-row"><span class="mawb">${r.mawb}</span><span>✈ ${esc(r.flight)}</span><span>目的 ${r.dest}</span><span>→ 進倉 ${r.warehouse||'—'}</span></div>`).join("")
+    : `<div class="dd-empty">這天沒有航班起飛</div>`;
+  const whRows = whs.length
+    ? whs.map(r=>`<div class="dd-row"><span class="mawb">${r.mawb}</span><span>✈ ${esc(r.flight)}</span><span>目的 ${r.dest}</span><span>航班日 ${r.flightDate||'—'}</span></div>`).join("")
+    : `<div class="dd-empty">這天沒有要進倉的貨</div>`;
+  $("calDetail").innerHTML = `<div class="day-detail">
+    <div class="dd-head">${ds}（${WEEK[d.getDay()]}）${hols.join(" ")}</div>
+    <div class="dd-sec"><div class="dd-label">✈ 這天起飛的航班（${flts.length}）</div>${fltRows}</div>
+    <div class="dd-sec"><div class="dd-label">📦 這天要進倉的貨（${whs.length}）</div>${whRows}</div>
+  </div>`;
+};
+
+function switchTab(tab){
+  document.querySelectorAll(".tab-btn").forEach(b=> b.classList.toggle("active", b.dataset.tab===tab));
+  $("tabList").style.display = tab==="list" ? "" : "none";
+  $("tabCal").style.display  = tab==="cal"  ? "" : "none";
+  if(tab==="cal") renderCalendar();
+}
+document.querySelectorAll(".tab-btn").forEach(b=> b.addEventListener("click", ()=>switchTab(b.dataset.tab)));
+
+function renderHolEditor(){
+  if(!$("holEditor")) return;
+  const ym = `${calYear}-${pad(calMonth+1)}`;
+  let items = "";
+  for(const c of ["TW","MY","SG"]){
+    const map = holidaysOf(c);
+    Object.keys(map).filter(d=>d.startsWith(ym)).sort().forEach(d=>{
+      items += `<div class="hol-item"><span class="cal-hol ${c}">${c}</span><span>${d}</span><span>${esc(map[d])}</span><button class="hol-x" title="移除" onclick="removeHoliday('${c}','${d}')">×</button></div>`;
+    });
+  }
+  $("holEditor").innerHTML = `
+    <div class="hol-head">調整 ${calYear}/${calMonth+1} 假期（只存這台裝置；改台灣假會影響之後新貼班表的進倉日）</div>
+    <div class="hol-list">${items || '<span class="note">這個月沒有假期</span>'}</div>
+    <div class="hol-add">
+      <select id="holCountry"><option value="TW">台灣</option><option value="MY">馬來</option><option value="SG">新加坡</option></select>
+      <input type="date" id="holDate" value="${ym}-01">
+      <input type="text" id="holName" placeholder="假期名稱">
+      <button class="btn btn-ghost btn-sm" onclick="addHoliday()">＋ 新增</button>
+    </div>`;
+}
+
+window.addHoliday = function(){
+  const c = $("holCountry").value, d = $("holDate").value, nm = ($("holName").value||"假期").trim();
+  if(!d){ alert("請選日期"); return; }
+  USER_HOL.add = USER_HOL.add||{}; USER_HOL.add[c] = USER_HOL.add[c]||{};
+  USER_HOL.add[c][d] = nm;
+  if(USER_HOL.hide && USER_HOL.hide[c]) USER_HOL.hide[c] = USER_HOL.hide[c].filter(x=>x!==d);
+  saveUserHolidays(); if(c==="TW") rebuildTWOff(); renderCalendar();
+};
+window.removeHoliday = function(c, d){
+  if(USER_HOL.add && USER_HOL.add[c] && USER_HOL.add[c][d]!=null){ delete USER_HOL.add[c][d]; }   // 自訂的直接刪
+  else { USER_HOL.hide = USER_HOL.hide||{}; USER_HOL.hide[c] = USER_HOL.hide[c]||[]; if(!USER_HOL.hide[c].includes(d)) USER_HOL.hide[c].push(d); } // 預設的標記隱藏
+  saveUserHolidays(); if(c==="TW") rebuildTWOff(); renderCalendar();
+};
+
+$("calPrev").addEventListener("click", ()=>{ if(--calMonth<0){ calMonth=11; calYear--; } renderCalendar(); });
+$("calNext").addEventListener("click", ()=>{ if(++calMonth>11){ calMonth=0; calYear++; } renderCalendar(); });
+$("calToday").addEventListener("click", ()=>{ const n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth(); renderCalendar(); });
+document.querySelectorAll(".calHolChk").forEach(chk=> chk.addEventListener("change", renderCalendar));
+
+window.delRow = async function(mawb){
+  if(!confirm(`刪除 ${mawb}？`)) return;
+  try{
+    await deleteFromSheet(mawb);
+    await fetchDB();
+    renderDB();
+  }catch(err){ alert("刪除失敗：" + err.message); }
+};
+
+// ===== events =====
+$("parseBtn").addEventListener("click", ()=>{
+  const text = $("rawInput").value;
+  const [y,mo] = $("baseMonth").value.split("-").map(Number);
+  pending = parseRaw(text, y, mo);
+  if(!pending.length){ alert("沒有解析到任何班表資料。\n支援格式（擇一）：\n  843-46243455 D7379/01OCT\n  232-18403571 MH367/04\n  189-05260474 JX-725/03\n  843-46137836 D7379/01 KUL"); $("previewCard").style.display="none"; return; }
+  renderPreview();
+});
+
+$("saveBtn").addEventListener("click", async ()=>{
+  // 驗證：MAWB 必填，且格式檢查
+  const bad = [];
+  pending.forEach((it,i)=>{
+    if(!it.mawb) bad.push(`第 ${i+1} 筆缺 MAWB`);
+    else if(!/^\d{3}-\d{8}$/.test(it.mawb)) bad.push(`第 ${i+1} 筆 MAWB 格式怪怪的（${it.mawb}）`);
+    if(it.flightDate && !/^\d{4}-\d{2}-\d{2}$/.test(it.flightDate)) bad.push(`第 ${i+1} 筆航班日格式應為 YYYY-MM-DD`);
+    if(it.warehouse && !/^\d{4}-\d{2}-\d{2}$/.test(it.warehouse)) bad.push(`第 ${i+1} 筆進倉日格式應為 YYYY-MM-DD`);
+  });
+  if(bad.length){
+    if(!confirm("以下幾筆可能有問題：\n\n" + bad.join("\n") + "\n\n還是要繼續存入嗎？")) return;
+  }
+  const btn = $("saveBtn");
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = "存入中…";
+  try{
+    const items = pending.filter(it=>it.mawb).map(it=>({
+      warehouse: it.warehouse, mawb: it.mawb, flight: it.flight,
+      dest: it.dest, flightDate: it.flightDate
+    }));
+    await saveToSheet(items);
+    await fetchDB();
+    pending = [];
+    $("rawInput").value = "";
+    $("previewCard").style.display="none";
+    renderDB();
+  }catch(err){
+    alert("存入失敗：" + err.message + "\n\n請檢查網路，或稍後再試。");
+  }finally{
+    btn.disabled = false; btn.textContent = orig;
+  }
+});
+
+$("clearBtn").addEventListener("click", async ()=>{
+  if(!confirm("確定清空整個資料庫？此動作無法復原，且會清掉雲端所有人共用的資料。")) return;
+  const btn = $("clearBtn"); btn.disabled=true;
+  try{
+    for(const r of DB_CACHE.slice()){ await deleteFromSheet(r.mawb); }
+    await fetchDB();
+    renderDB();
+  }catch(err){ alert("清空失敗：" + err.message); }
+  finally{ btn.disabled=false; }
+});
+
+$("exportBtn").addEventListener("click", async ()=>{
+  try{ await fetchDB(); }catch(err){ alert("無法取得最新雲端資料：" + err.message); return; }
+  const db = loadDB();
+  if(!db.length){ alert("資料庫是空的，沒有東西可匯出。"); return; }
+  // 匯出成「訂位資料」欄位；能算的自動帶，PC/WT、W/H、備註 留白讓你自己填
+  const rows = db.slice().sort((a,b)=> (a.flightDate||"").localeCompare(b.flightDate||"") || a.mawb.localeCompare(b.mawb))
+    .map(r=>({
+      "進倉日": r.warehouse||"",
+      "MAWB No": r.mawb,
+      "FLT/DATE": fltDateStr(r),
+      "MONTH": monthAbbr(r),
+      "DATE": weekdayTW(r),
+      "DEST": r.dest,
+      "PC/WT": "",
+      "W/H": "",
+      "備註": ""
+    }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws["!cols"] = [{wch:12},{wch:16},{wch:12},{wch:7},{wch:7},{wch:7},{wch:12},{wch:14},{wch:16}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, COUNTRY_NAME[currentCountry] || currentCountry || "MAWB");
+  const today = iso(new Date());
+  XLSX.writeFile(wb, `${today}_訂位資料_${COUNTRY_NAME[currentCountry]||""}.xlsx`);
+});
+
+// 國別選擇
+window.selectCountry = function(c){
+  currentCountry = c;
+  // 切換時清掉預覽與輸入，避免跨國別混到
+  pending = [];
+  $("rawInput").value = "";
+  $("previewCard").style.display = "none";
+  // 按鈕外觀
+  document.querySelectorAll(".country-btn").forEach(b=>{
+    b.classList.toggle("active", b.dataset.country===c);
+  });
+  // 標題膠囊顯示目前國別
+  document.querySelector(".cloud-tag").textContent = `☁️ 雲端版 · ${COUNTRY_NAME[c]}`;
+  // 月曆自動勾選該國假期（台灣一律顯示）
+  document.querySelectorAll(".calHolChk").forEach(chk=>{ if(chk.value===c) chk.checked = true; });
+  // 顯示主內容、更新匯出檔名用的標題、載入該國資料
+  $("mainContent").style.display = "block";
+  $("dbWrap").innerHTML = '<div class="empty">☁️ 正在從雲端載入資料…</div>';
+  fetchDB().then(renderDB).catch(err=>{
+    $("dbWrap").innerHTML = `<div class="empty danger">雲端連線失敗：${err.message}<br>請確認網路，重新整理頁面再試。</div>`;
+    renderCalendar();
+  });
+};
+
+// init
+renderMonthOptions();
+</script>
+</body>
+</html>
